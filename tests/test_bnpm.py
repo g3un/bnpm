@@ -9,7 +9,7 @@ import unittest
 from unittest.mock import patch
 
 from bnpm.cli import main
-from bnpm.lockfile import LockedPlugin, load_lockfile, write_lockfile
+from bnpm.lockfile import LockedPackage, LockedPlugin, load_lockfile, write_lockfile
 from bnpm.manifest import load_manifest
 from bnpm.runtime import activate
 from bnpm.source import SourceSpec, parse_plugin
@@ -110,6 +110,16 @@ class LockfileTests(unittest.TestCase):
                         version="tag:v1.2.3",
                         checksum="sha256:deadbeef",
                         commit="abc123",
+                        dependencies=["requests>=2.31,<3"],
+                    )
+                ],
+                [
+                    LockedPackage(
+                        name="requests",
+                        source="pypi+https://files.pythonhosted.org/packages/requests.whl",
+                        version="pypi:2.32.3",
+                        checksum="sha256:cafebabe",
+                        dependencies=["urllib3<3,>=1.21.1"],
                     )
                 ],
             )
@@ -118,6 +128,31 @@ class LockfileTests(unittest.TestCase):
         self.assertEqual(lockfile.plugins[0].name, "hexpatch")
         self.assertEqual(lockfile.plugins[0].version, "tag:v1.2.3")
         self.assertEqual(lockfile.plugins[0].commit, "abc123")
+        self.assertEqual(lockfile.plugins[0].dependencies, ["requests>=2.31,<3"])
+        self.assertEqual(lockfile.packages[0].name, "requests")
+        self.assertEqual(lockfile.packages[0].version, "pypi:2.32.3")
+        self.assertEqual(lockfile.packages[0].checksum, "sha256:cafebabe")
+        self.assertEqual(lockfile.packages[0].dependencies, ["urllib3<3,>=1.21.1"])
+
+    def test_load_lockfile_defaults_missing_dependencies(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "bnpm.lock"
+            path.write_text(
+                """
+version = 1
+
+[[plugins]]
+name = "hexpatch"
+source = "https://github.com/user/hexpatch.git"
+checksum = "sha256:deadbeef"
+""".strip(),
+                encoding="utf-8",
+            )
+
+            lockfile = load_lockfile(path)
+
+        self.assertEqual(lockfile.plugins[0].dependencies, [])
+        self.assertEqual(lockfile.packages, [])
 
     def test_write_lockfile_does_not_leave_temp_files(self):
         with tempfile.TemporaryDirectory() as temp:

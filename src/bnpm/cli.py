@@ -146,7 +146,7 @@ def _update(names: list[str], manifest_path: Path, lock_path: Path, home: Path) 
         for name in selected_names
     ]
     lockfile = load_lockfile(lock_path)
-    write_lockfile(lock_path, merge_plugins(lockfile.plugins, installed))
+    write_lockfile(lock_path, merge_plugins(lockfile.plugins, installed), lockfile.packages)
     for plugin in installed:
         print(f"updated {plugin.name} {plugin.version or 'local'} {plugin.commit or plugin.source}")
     return 0
