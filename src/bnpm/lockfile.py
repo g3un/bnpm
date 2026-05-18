@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-import os
 from pathlib import Path
-import tempfile
 
+from .atomic import atomic_write_text
 from .toml_compat import load_toml
 
 
@@ -46,24 +45,7 @@ def load_lockfile(path: Path) -> Lockfile:
 
 
 def write_lockfile(path: Path, plugins: list[LockedPlugin]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    content = _format_lockfile(plugins)
-    with tempfile.NamedTemporaryFile(
-        "w",
-        encoding="utf-8",
-        dir=path.parent,
-        prefix=f".{path.name}.",
-        suffix=".tmp",
-        delete=False,
-    ) as handle:
-        temp_path = Path(handle.name)
-        handle.write(content)
-
-    try:
-        os.replace(temp_path, path)
-    except Exception:
-        temp_path.unlink(missing_ok=True)
-        raise
+    atomic_write_text(path, _format_lockfile(plugins), allow_direct_fallback=True)
 
 
 def _format_lockfile(plugins: list[LockedPlugin]) -> str:
