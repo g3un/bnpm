@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+from dataclasses import replace
 from pathlib import Path
 import sys
 
@@ -8,7 +9,7 @@ from .errors import BnpmError
 from .fetch import install
 from .lockfile import load_lockfile, merge_plugins, write_lockfile
 from .manifest import Manifest, load_manifest, write_manifest
-from .source import parse_plugin
+from .source import SourceSpec, parse_plugin
 from .status import load_manifest_plugins, lock_mismatches
 from .store import default_home, default_manifest_path
 from .sync import resolve_manifest_path_spec, sync
@@ -23,7 +24,13 @@ def main(argv: list[str] | None = None) -> int:
 
     add_parser = subparsers.add_parser("add")
     add_parser.add_argument("name")
-    add_parser.add_argument("source")
+    source_group = add_parser.add_mutually_exclusive_group(required=True)
+    source_group.add_argument("--git")
+    source_group.add_argument("--path")
+    ref_group = add_parser.add_mutually_exclusive_group()
+    ref_group.add_argument("--tag")
+    ref_group.add_argument("--branch")
+    ref_group.add_argument("--rev")
 
     remove_parser = subparsers.add_parser("remove")
     remove_parser.add_argument("name")
@@ -41,7 +48,17 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         if args.command == "add":
-            return _add(args.name, args.source, manifest_path, lock_path, home)
+            return _add(
+                args.name,
+                args.git,
+                args.path,
+                args.tag,
+                args.branch,
+                args.rev,
+                manifest_path,
+                lock_path,
+                home,
+            )
         if args.command == "remove":
             return _remove(args.name, manifest_path, lock_path, home)
         if args.command == "update":
@@ -58,7 +75,11 @@ def main(argv: list[str] | None = None) -> int:
 
 def _add(
     name: str,
-    source: str,
+    git: str | None,
+    path: str | None,
+    tag: str | None,
+    branch: str | None,
+    rev: str | None,
     manifest_path: Path,
     lock_path: Path,
     home: Path,
@@ -66,16 +87,36 @@ def _add(
     _ensure_clean_manifest_lock(manifest_path, lock_path)
     manifest = _load_or_empty_manifest(manifest_path)
 
-    source_path = Path(source).expanduser()
-    if source_path.exists():
+    if path is not None:
+        if tag or branch or rev:
+            raise BnpmError("local path plugins cannot set tag, branch, or rev")
+        source_path = Path(path).expanduser()
         spec = parse_plugin(name, {"path": str(source_path.resolve())})
     else:
-        spec = parse_plugin(name, source)
+        assert git is not None
+        spec = parse_plugin(name, git)
+        spec = _apply_ref_options(spec, tag=tag, branch=branch, rev=rev)
 
     plugins = dict(manifest.plugins)
     plugins[name] = spec
     write_manifest(manifest_path, plugins)
     return _sync(manifest_path, lock_path, home)
+
+
+def _apply_ref_options(
+    spec: SourceSpec,
+    *,
+    tag: str | None,
+    branch: str | None,
+    rev: str | None,
+) -> SourceSpec:
+    if not any((tag, branch, rev)):
+        return spec
+    if spec.kind == "path":
+        raise BnpmError("local path plugins cannot set tag, branch, or rev")
+    if spec.tag or spec.branch or spec.rev:
+        raise BnpmError("plugin source already specifies a ref")
+    return replace(spec, tag=tag, branch=branch, rev=rev)
 
 
 def _remove(name: str, manifest_path: Path, lock_path: Path, home: Path) -> int:

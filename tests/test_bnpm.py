@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import os
+import contextlib
+import io
 import tempfile
 from pathlib import Path
 import unittest
+from unittest.mock import patch
 
 from bnpm.cli import main
 from bnpm.lockfile import LockedPlugin, load_lockfile, write_lockfile
@@ -24,13 +27,13 @@ from bnpm.toml_compat import _parse_subset
 
 
 class SourceTests(unittest.TestCase):
-    def test_github_shorthand_with_tag(self):
-        spec = parse_plugin("hexpatch", "github.com/user/hexpatch@v1.2.3")
+    def test_github_shorthand(self):
+        spec = parse_plugin("hexpatch", "github.com/user/hexpatch")
 
         self.assertEqual(spec.name, "hexpatch")
         self.assertEqual(spec.kind, "git")
         self.assertEqual(spec.git, "https://github.com/user/hexpatch.git")
-        self.assertEqual(spec.tag, "v1.2.3")
+        self.assertEqual(spec.version, "HEAD")
 
     def test_git_table_with_rev(self):
         spec = parse_plugin(
@@ -45,6 +48,20 @@ class SourceTests(unittest.TestCase):
 
         self.assertEqual(spec.version, "HEAD")
 
+    def test_query_string_refs_are_not_supported(self):
+        with self.assertRaisesRegex(Exception, "query strings are not supported"):
+            parse_plugin("hexpatch", "github.com/user/hexpatch?branch=main")
+
+    def test_inline_refs_are_not_supported(self):
+        with self.assertRaisesRegex(Exception, "inline refs are not supported"):
+            parse_plugin("hexpatch", "github.com/user/hexpatch@v1.2.3")
+
+    def test_ssh_shorthand_does_not_treat_at_as_tag(self):
+        spec = parse_plugin("hexpatch", "git@github.com:user/hexpatch.git")
+
+        self.assertEqual(spec.git, "git@github.com:user/hexpatch.git")
+        self.assertEqual(spec.version, "HEAD")
+
 
 class ManifestTests(unittest.TestCase):
     def test_load_manifest(self):
@@ -55,7 +72,7 @@ class ManifestTests(unittest.TestCase):
 version = 1
 
 [plugins]
-hexpatch = "github.com/user/hexpatch@v1.2.3"
+hexpatch = { git = "https://github.com/user/hexpatch.git", tag = "v1.2.3" }
 """.strip(),
                 encoding="utf-8",
             )
@@ -71,7 +88,7 @@ hexpatch = "github.com/user/hexpatch@v1.2.3"
 version = 1
 
 [plugins]
-hexpatch = "github.com/user/hexpatch@v1.2.3"
+hexpatch = { git = "https://github.com/user/hexpatch.git", tag = "v1.2.3" }
 devtools = { git = "https://github.com/user/devtools.git", branch = "main" }
 """.strip()
         )
@@ -197,6 +214,7 @@ class CliRuntimeTests(unittest.TestCase):
                     str(root / "home"),
                     "add",
                     "local",
+                    "--path",
                     str(plugin),
                 ]
             )
@@ -210,7 +228,7 @@ class CliRuntimeTests(unittest.TestCase):
             lockfile = load_lockfile(root / "bnpm.lock")
             self.assertEqual(lockfile.plugins[0].name, "local")
 
-    def test_add_existing_source_path_treats_it_as_path_plugin(self):
+    def test_add_path_treats_it_as_path_plugin(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             plugin = root / "plugin"
@@ -226,6 +244,7 @@ class CliRuntimeTests(unittest.TestCase):
                     str(root / "home"),
                     "add",
                     "local",
+                    "--path",
                     str(plugin),
                 ]
             )
@@ -233,6 +252,101 @@ class CliRuntimeTests(unittest.TestCase):
             self.assertEqual(code, 0)
             self.assertEqual(load_manifest(manifest).plugins["local"].kind, "path")
             self.assertEqual(load_lockfile(root / "bnpm.lock").plugins[0].source, plugin.resolve().as_uri())
+
+    def test_add_git_plugin_accepts_branch_option(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            manifest = root / "bnpm.toml"
+
+            def fake_install(spec, home):
+                return LockedPlugin(
+                    name=spec.name,
+                    source=spec.git,
+                    version=spec.version,
+                    checksum="sha256:fake",
+                    commit="abc123",
+                )
+
+            with patch("bnpm.sync.install", side_effect=fake_install):
+                code = main(
+                    [
+                        "--manifest-path",
+                        str(manifest),
+                        "--home",
+                        str(root / "home"),
+                        "add",
+                        "devtools",
+                        "--git",
+                        "github.com/user/devtools",
+                        "--branch",
+                        "main",
+                    ]
+                )
+
+            spec = load_manifest(manifest).plugins["devtools"]
+            locked = load_lockfile(root / "bnpm.lock").plugins[0]
+            self.assertEqual(code, 0)
+            self.assertEqual(spec.branch, "main")
+            self.assertEqual(locked.version, "branch:main")
+
+    def test_add_local_path_rejects_ref_options(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            plugin = root / "plugin"
+            plugin.mkdir()
+            manifest = root / "bnpm.toml"
+
+            code = main(
+                [
+                    "--manifest-path",
+                    str(manifest),
+                    "--home",
+                    str(root / "home"),
+                    "add",
+                    "local",
+                    "--path",
+                    str(plugin),
+                    "--branch",
+                    "main",
+                ]
+            )
+
+            self.assertEqual(code, 1)
+
+    def test_add_requires_explicit_source_kind(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                main(
+                    [
+                        "--manifest-path",
+                        str(root / "bnpm.toml"),
+                        "--home",
+                        str(root / "home"),
+                        "add",
+                        "plugin",
+                        "github.com/user/plugin",
+                    ]
+                )
+
+    def test_add_rejects_multiple_source_kinds(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                main(
+                    [
+                        "--manifest-path",
+                        str(root / "bnpm.toml"),
+                        "--home",
+                        str(root / "home"),
+                        "add",
+                        "plugin",
+                        "--git",
+                        "github.com/user/plugin",
+                        "--path",
+                        "plugin",
+                    ]
+                )
 
     def test_remove_updates_manifest_and_syncs(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -332,6 +446,7 @@ stale = { path = "plugin" }
                     str(root / "home"),
                     "add",
                     "local",
+                    "--path",
                     str(plugin),
                 ]
             )
