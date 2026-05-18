@@ -73,7 +73,11 @@ def _add(
         spec = parse_plugin(name, {"path": str(absolute_path)})
     else:
         assert source is not None
-        spec = parse_plugin(name, source)
+        source_path = Path(source).expanduser()
+        if source_path.exists():
+            spec = parse_plugin(name, {"path": str(source_path.resolve())})
+        else:
+            spec = parse_plugin(name, source)
 
     plugins = dict(manifest.plugins)
     plugins[name] = spec

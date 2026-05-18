@@ -210,6 +210,30 @@ class CliRuntimeTests(unittest.TestCase):
             lockfile = load_lockfile(root / "bnpm.lock")
             self.assertEqual(lockfile.plugins[0].name, "local")
 
+    def test_add_existing_source_path_treats_it_as_path_plugin(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            plugin = root / "plugin"
+            plugin.mkdir()
+            plugin.joinpath("__init__.py").write_text("", encoding="utf-8")
+            manifest = root / "bnpm.toml"
+
+            code = main(
+                [
+                    "--manifest-path",
+                    str(manifest),
+                    "--home",
+                    str(root / "home"),
+                    "add",
+                    "local",
+                    str(plugin),
+                ]
+            )
+
+            self.assertEqual(code, 0)
+            self.assertEqual(load_manifest(manifest).plugins["local"].kind, "path")
+            self.assertEqual(load_lockfile(root / "bnpm.lock").plugins[0].source, plugin.resolve().as_uri())
+
     def test_remove_updates_manifest_and_syncs(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
