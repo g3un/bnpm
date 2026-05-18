@@ -8,6 +8,10 @@ from urllib.request import url2pathname
 
 from .source import SourceSpec
 
+SAFE_PATH_SEGMENT_CHARS = frozenset(
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+)
+
 
 def project_root_from_manifest(manifest_path: Path) -> Path:
     return manifest_path.resolve().parent
@@ -91,11 +95,21 @@ def _managed_git_parts(source: str) -> list[str]:
     path = parsed.path.removesuffix(".git")
     parts = [parsed.netloc, *PurePosixPath(path).parts]
     clean = [part for part in parts if part not in {"", "/"}]
-    if any(part in {".", ".."} for part in clean):
-        raise ValueError(f"git source contains unsafe path segment: {source}")
     if len(clean) < 3:
         raise ValueError(f"git source path is too short: {source}")
-    return clean
+    return [_encode_path_segment(part) for part in clean]
+
+
+def _encode_path_segment(value: str) -> str:
+    if not value:
+        raise ValueError("empty managed plugin path segment")
+    encoded = []
+    for char in value:
+        if char in SAFE_PATH_SEGMENT_CHARS:
+            encoded.append(char)
+        else:
+            encoded.extend(f"%{byte:02X}" for byte in char.encode("utf-8"))
+    return "".join(encoded)
 
 
 def _normalize_git_source_for_parse(source: str) -> str:

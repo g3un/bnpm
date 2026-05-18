@@ -9,13 +9,14 @@ from bnpm.cli import main
 from bnpm.lockfile import LockedPlugin, load_lockfile, write_lockfile
 from bnpm.manifest import load_manifest
 from bnpm.runtime import activate
-from bnpm.source import parse_plugin
+from bnpm.source import SourceSpec, parse_plugin
 from bnpm.status import load_manifest_plugins, lock_mismatches
 from bnpm.store import (
     default_config_dir,
     default_home,
     default_manifest_path,
     file_uri_to_path,
+    install_dir,
     managed_git_dir,
     path_to_file_uri,
 )
@@ -460,14 +461,17 @@ local = { path = "plugin" }
             self.assertTrue(uri.startswith("file://"))
             self.assertEqual(file_uri_to_path(uri), path)
 
-    def test_managed_git_dir_rejects_path_traversal(self):
+    def test_managed_git_dir_encodes_dot_segments(self):
         with tempfile.TemporaryDirectory() as temp:
-            with self.assertRaises(ValueError):
-                managed_git_dir(
-                    Path(temp),
-                    "https://github.com/user/../../evil.git",
-                    "abc123",
-                )
+            home = Path(temp)
+            path = managed_git_dir(
+                home,
+                "https://github.com/user/../../evil.git",
+                "abc123",
+            )
+
+        self.assertIn("%2E%2E", path.parts)
+        self.assertTrue(path.is_relative_to(home.resolve()))
 
     def test_managed_git_dir_handles_ssh_sources(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -475,10 +479,39 @@ local = { path = "plugin" }
                 Path(temp),
                 "git@github.com:user/repo.git",
                 "abc123",
-            )
+        )
 
         self.assertEqual(path.name, "abc123")
-        self.assertIn("github.com", path.parts)
+        self.assertIn("github%2Ecom", path.parts)
+
+    def test_managed_git_dir_encodes_path_segments(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path = managed_git_dir(
+                Path(temp),
+                "https://git.example.com/user/repo:name.git",
+                "abc123",
+            )
+
+        self.assertIn("repo%3Aname", path.parts)
+
+    def test_managed_git_dir_handles_tilde_and_backslash_segments(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path = managed_git_dir(
+                Path(temp),
+                "https://git.example.com/user/repo~name\\extra.git",
+                "abc123",
+            )
+
+        self.assertIn("repo%7Ename%5Cextra", path.parts)
+
+    def test_path_install_dir_expands_user_home(self):
+        path = install_dir(
+            Path("unused"),
+            SourceSpec(name="local", kind="path", path="~"),
+            "unused",
+        )
+
+        self.assertEqual(path, Path.home().resolve())
 
 
 if __name__ == "__main__":
