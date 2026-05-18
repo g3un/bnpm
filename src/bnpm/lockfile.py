@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
 from pathlib import Path
+import tempfile
 
 from .toml_compat import load_toml
 
@@ -45,6 +47,26 @@ def load_lockfile(path: Path) -> Lockfile:
 
 def write_lockfile(path: Path, plugins: list[LockedPlugin]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
+    content = _format_lockfile(plugins)
+    with tempfile.NamedTemporaryFile(
+        "w",
+        encoding="utf-8",
+        dir=path.parent,
+        prefix=f".{path.name}.",
+        suffix=".tmp",
+        delete=False,
+    ) as handle:
+        temp_path = Path(handle.name)
+        handle.write(content)
+
+    try:
+        os.replace(temp_path, path)
+    except Exception:
+        temp_path.unlink(missing_ok=True)
+        raise
+
+
+def _format_lockfile(plugins: list[LockedPlugin]) -> str:
     lines = [f"version = {LOCK_VERSION}", ""]
     for plugin in sorted(plugins, key=lambda item: item.name):
         lines.extend(
@@ -60,7 +82,7 @@ def write_lockfile(path: Path, plugins: list[LockedPlugin]) -> None:
         if plugin.commit is not None:
             lines.append(f'commit = "{_escape(plugin.commit)}"')
         lines.append("")
-    path.write_text("\n".join(lines), encoding="utf-8")
+    return "\n".join(lines)
 
 
 def merge_plugins(existing: list[LockedPlugin], updates: list[LockedPlugin]) -> list[LockedPlugin]:

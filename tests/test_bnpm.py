@@ -101,6 +101,26 @@ class LockfileTests(unittest.TestCase):
         self.assertEqual(lockfile.plugins[0].version, "tag:v1.2.3")
         self.assertEqual(lockfile.plugins[0].commit, "abc123")
 
+    def test_write_lockfile_does_not_leave_temp_files(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "bnpm.lock"
+            write_lockfile(
+                path,
+                [
+                    LockedPlugin(
+                        name="hexpatch",
+                        source="https://github.com/user/hexpatch.git",
+                        version="HEAD",
+                        checksum="sha256:deadbeef",
+                        commit="abc123",
+                    )
+                ],
+            )
+
+            temp_files = list(Path(temp).glob(".bnpm.lock.*.tmp"))
+
+        self.assertEqual(temp_files, [])
+
     def test_manifest_lock_mismatch_detects_missing_plugin(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
