@@ -18,6 +18,7 @@ class LockedPlugin:
     version: str | None = None
     commit: str | None = None
     dependencies: list[str] | None = None
+    requirements: list[str] | None = None
 
 
 @dataclass(frozen=True)

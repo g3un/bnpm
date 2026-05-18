@@ -10,15 +10,16 @@ from .hash import tree_sha256
 from .lockfile import LockedPlugin
 from .source import SourceSpec
 from .store import install_dir, path_to_file_uri
+from .toml_compat import load_toml
 
 
-def install(spec: SourceSpec, home: Path) -> LockedPlugin:
+def install(spec: SourceSpec, home: Path, progress=None) -> LockedPlugin:
     if spec.kind == "path":
-        return _lock_path_spec(spec, home)
-    return _install_git_spec(spec, home)
+        return _lock_path_spec(spec, home, progress=progress)
+    return _install_git_spec(spec, home, progress=progress)
 
 
-def _lock_path_spec(spec: SourceSpec, home: Path) -> LockedPlugin:
+def _lock_path_spec(spec: SourceSpec, home: Path, progress=None) -> LockedPlugin:
     if not spec.path:
         raise FetchError(f"{spec.name}: path source is missing path")
     path = Path(spec.path).expanduser().resolve()
@@ -30,10 +31,11 @@ def _lock_path_spec(spec: SourceSpec, home: Path) -> LockedPlugin:
         source=path_to_file_uri(path),
         version=spec.version,
         checksum=checksum,
+        requirements=_read_requirements(path, progress=progress),
     )
 
 
-def _install_git_spec(spec: SourceSpec, home: Path) -> LockedPlugin:
+def _install_git_spec(spec: SourceSpec, home: Path, progress=None) -> LockedPlugin:
     if not spec.git:
         raise FetchError(f"{spec.name}: git source is missing URL")
 
@@ -56,6 +58,7 @@ def _install_git_spec(spec: SourceSpec, home: Path) -> LockedPlugin:
         version=spec.version,
         commit=commit,
         checksum=checksum,
+        requirements=_read_requirements(target, progress=progress),
     )
 
 
@@ -81,3 +84,44 @@ def _capture(args: list[str], cwd: Path) -> str:
         message = result.stderr.strip() or result.stdout.strip() or "unknown git error"
         raise FetchError(message)
     return result.stdout.strip()
+
+
+def _read_requirements(plugin_path: Path, progress=None) -> list[str]:
+    pyproject_path = plugin_path / "pyproject.toml"
+    requirements_path = plugin_path / "requirements.txt"
+    if pyproject_path.exists():
+        if requirements_path.exists():
+            _progress(progress, f"ignored {requirements_path}: pyproject.toml is present")
+        return _read_pyproject_dependencies(pyproject_path)
+
+    if not requirements_path.exists():
+        return []
+
+    dependencies = []
+    for line in requirements_path.read_text(encoding="utf-8").splitlines():
+        requirement = line.strip()
+        if not requirement or requirement.startswith("#"):
+            continue
+        dependencies.append(requirement)
+    return dependencies
+
+
+def _read_pyproject_dependencies(path: Path) -> list[str]:
+    try:
+        data = load_toml(path)
+    except ValueError as exc:
+        raise FetchError(f"invalid pyproject.toml: {exc}") from exc
+    project = data.get("project", {})
+    if not isinstance(project, dict):
+        return []
+    dependencies = project.get("dependencies", [])
+    if dependencies is None:
+        return []
+    if not isinstance(dependencies, list) or not all(isinstance(item, str) for item in dependencies):
+        raise FetchError("[project].dependencies must be a list of strings")
+    return dependencies
+
+
+def _progress(progress, message: str) -> None:
+    if progress is not None:
+        progress(message)

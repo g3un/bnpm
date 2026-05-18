@@ -3,13 +3,15 @@ from __future__ import annotations
 import importlib.util
 import os
 from pathlib import Path
+import re
 import sys
 
 from .hash import tree_sha256
 from .lockfile import load_lockfile
 from .status import load_manifest_plugins, lock_mismatches
-from .store import default_home, default_lock_path, plugin_dir_from_lock
+from .store import default_home, default_lock_path, package_dir, plugin_dir_from_lock
 from .sync import sync
+from .toml_compat import load_toml
 
 
 LOGGER = "BNPM"
@@ -22,6 +24,7 @@ def activate(lock_path: Path | None = None, home: Path | None = None) -> None:
     lockfile = load_lockfile(lock_path)
     lockfile = _maybe_sync_stale_manifest(lock_path, home, lockfile)
     _log_info(f"found {len(lockfile.plugins)} locked plugin(s)")
+    _add_package_dir(home)
 
     for plugin in lockfile.plugins:
         _log_info(f"resolving {plugin.name} from {plugin.source}")
@@ -61,7 +64,12 @@ def _maybe_sync_stale_manifest(lock_path, home, lockfile):
         return lockfile
 
     try:
-        installed = sync(manifest_path=manifest_path, lock_path=lock_path, home=home)
+        installed = sync(
+            manifest_path=manifest_path,
+            lock_path=lock_path,
+            home=home,
+            progress=_log_info,
+        )
         _log_info(f"synced {len(installed)} plugin(s)")
         return load_lockfile(lock_path)
     except Exception as exc:
@@ -112,6 +120,15 @@ def _resolve_plugin_path(home: Path, source: str, commit: str | None) -> Path | 
         return None
 
 
+def _add_package_dir(home: Path) -> None:
+    path = package_dir(home)
+    if not path.exists():
+        return
+    package_path = str(path)
+    if package_path not in sys.path:
+        sys.path.insert(0, package_path)
+
+
 def _verify_checksum(name: str, plugin_path: Path, is_path_plugin: bool, expected: str) -> bool:
     if not plugin_path.exists():
         _log_warning(f"skipped {name}: missing plugin path {plugin_path}")
@@ -131,16 +148,16 @@ def _verify_checksum(name: str, plugin_path: Path, is_path_plugin: bool, expecte
 
 
 def _load_plugin(name: str, plugin_path: Path) -> None:
-    init_path = plugin_path / "__init__.py"
-    if not init_path.exists():
-        _log_warning(f"skipped {name}: missing {init_path}")
+    entry = _resolve_plugin_entry(name, plugin_path)
+    if entry is None:
         return
+    init_path, import_base = entry
 
-    plugin_parent = str(plugin_path)
+    plugin_parent = str(import_base)
     if plugin_parent not in sys.path:
         sys.path.insert(0, plugin_parent)
 
-    module_name = f"_bnpm_managed_{_sanitize(name)}"
+    module_name = f"_bnpm_plugin_{_sanitize(name)}"
     if module_name in sys.modules:
         _log_info(f"skipped {name}: already loaded as {module_name}")
         return
@@ -148,7 +165,7 @@ def _load_plugin(name: str, plugin_path: Path) -> None:
     spec = importlib.util.spec_from_file_location(
         module_name,
         init_path,
-        submodule_search_locations=[str(plugin_path)],
+        submodule_search_locations=[str(init_path.parent)],
     )
     if spec is None or spec.loader is None:
         _log_warning(f"skipped {name}: cannot create import spec")
@@ -167,6 +184,91 @@ def _load_plugin(name: str, plugin_path: Path) -> None:
 
 def _sanitize(name: str) -> str:
     return "".join(char if char.isalnum() else "_" for char in name)
+
+
+def _resolve_plugin_entry(name: str, plugin_path: Path) -> tuple[Path, Path] | None:
+    pyproject_path = plugin_path / "pyproject.toml"
+    if pyproject_path.exists():
+        pyproject = _load_pyproject(pyproject_path)
+        if pyproject is None:
+            return None
+        explicit = _tool_bnpm_entry(name, plugin_path, pyproject)
+        if explicit is not None:
+            return explicit
+        project_name = _pyproject_name(pyproject)
+        if project_name:
+            package_name = _import_package_name(project_name)
+            init_path = plugin_path / "src" / package_name / "__init__.py"
+            if init_path.exists():
+                return init_path, plugin_path / "src"
+
+    init_path = plugin_path / "__init__.py"
+    if init_path.exists():
+        return init_path, plugin_path
+
+    _log_warning(f"skipped {name}: missing plugin entry point")
+    return None
+
+
+def _load_pyproject(path: Path) -> dict | None:
+    try:
+        return load_toml(path)
+    except Exception as exc:
+        _log_warning(f"could not read {path}: {exc}")
+        return None
+
+
+def _tool_bnpm_entry(name: str, plugin_path: Path, pyproject: dict) -> tuple[Path, Path] | None:
+    tool = pyproject.get("tool", {})
+    if not isinstance(tool, dict):
+        return None
+    if "bnpm" not in tool:
+        return None
+    bnpm = tool.get("bnpm")
+    if not isinstance(bnpm, dict):
+        _log_warning(f"skipped {name}: [tool.bnpm] must be a table")
+        return None
+    if not bnpm:
+        return None
+    package = bnpm.get("package")
+    source = bnpm.get("source", ".")
+    if not isinstance(package, str) or not package:
+        _log_warning(f"skipped {name}: [tool.bnpm].package must be a string")
+        return None
+    if not isinstance(source, str) or not source:
+        _log_warning(f"skipped {name}: [tool.bnpm].source must be a string")
+        return None
+    import_base = (plugin_path / source).resolve()
+    init_path = import_base / package / "__init__.py"
+    if not _is_relative_to(import_base, plugin_path.resolve()):
+        _log_warning(f"skipped {name}: [tool.bnpm].source escapes plugin directory")
+        return None
+    if not init_path.exists():
+        _log_warning(f"skipped {name}: missing {init_path}")
+        return None
+    return init_path, import_base
+
+
+def _pyproject_name(data: dict) -> str | None:
+    project = data.get("project", {})
+    if not isinstance(project, dict):
+        return None
+    name = project.get("name")
+    if not isinstance(name, str) or not name:
+        return None
+    return name
+
+
+def _import_package_name(project_name: str) -> str:
+    return re.sub(r"[-.]+", "_", project_name)
+
+
+def _is_relative_to(path: Path, parent: Path) -> bool:
+    try:
+        path.relative_to(parent)
+        return True
+    except ValueError:
+        return False
 
 
 def _log_warning(message: str) -> None:

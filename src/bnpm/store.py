@@ -62,12 +62,16 @@ def default_home() -> Path:
     return default_data_dir() / "plugins"
 
 
+def package_dir(home: Path) -> Path:
+    return home.expanduser().resolve().parent / "packages"
+
+
 def install_dir(home: Path, spec: SourceSpec, commit: str) -> Path:
     if spec.kind == "path":
         return Path(spec.path or "").expanduser().resolve()
 
     assert spec.git is not None
-    return managed_git_dir(home, spec.git, commit)
+    return plugin_dir(home, spec.git, commit)
 
 
 def plugin_dir_from_lock(home: Path, source: str, commit: str | None) -> Path:
@@ -75,19 +79,19 @@ def plugin_dir_from_lock(home: Path, source: str, commit: str | None) -> Path:
         if source.startswith("file://"):
             return file_uri_to_path(source)
         return Path(source).expanduser().resolve()
-    return managed_git_dir(home, source, commit)
+    return plugin_dir(home, source, commit)
 
 
-def managed_git_dir(home: Path, source: str, commit: str) -> Path:
-    parts = _managed_git_parts(source)
+def plugin_dir(home: Path, source: str, commit: str) -> Path:
+    parts = _plugin_dir_parts(source)
     target = home.joinpath(*parts, commit).resolve()
     home = home.resolve()
     if not target.is_relative_to(home):
-        raise ValueError(f"managed plugin path escapes BNPM home: {source}")
+        raise ValueError(f"plugin path escapes BNPM home: {source}")
     return target
 
 
-def _managed_git_parts(source: str) -> list[str]:
+def _plugin_dir_parts(source: str) -> list[str]:
     parsed = urlparse(_normalize_git_source_for_parse(source))
     if not parsed.netloc:
         raise ValueError(f"git source is missing host: {source}")
@@ -102,7 +106,7 @@ def _managed_git_parts(source: str) -> list[str]:
 
 def _encode_path_segment(value: str) -> str:
     if not value:
-        raise ValueError("empty managed plugin path segment")
+        raise ValueError("empty plugin path segment")
     encoded = []
     for char in value:
         if char in SAFE_PATH_SEGMENT_CHARS:
