@@ -5,12 +5,12 @@ from pathlib import Path
 import sys
 
 from .errors import BnpmError
-from .fetch import install
-from .lockfile import load_lockfile, merge_plugins, write_lockfile
-from .manifest import load_manifest
+from .lockfile import load_lockfile
+from .manifest import Manifest, load_manifest, write_manifest
 from .source import parse_plugin
+from .status import load_manifest_plugins, lock_mismatches
 from .store import default_home, default_manifest_path
-from .sync import resolve_manifest_path_spec, sync
+from .sync import sync
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -20,8 +20,13 @@ def main(argv: list[str] | None = None) -> int:
 
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    install_parser = subparsers.add_parser("install")
-    install_parser.add_argument("plugin", nargs="?")
+    add_parser = subparsers.add_parser("add")
+    add_parser.add_argument("name")
+    add_parser.add_argument("source", nargs="?")
+    add_parser.add_argument("--path")
+
+    remove_parser = subparsers.add_parser("remove")
+    remove_parser.add_argument("name")
 
     subparsers.add_parser("sync")
     subparsers.add_parser("list")
@@ -32,8 +37,10 @@ def main(argv: list[str] | None = None) -> int:
     home = Path(args.home).expanduser().resolve() if args.home else default_home()
 
     try:
-        if args.command == "install":
-            return _install(args.plugin, manifest_path, lock_path, home)
+        if args.command == "add":
+            return _add(args.name, args.source, args.path, manifest_path, lock_path, home)
+        if args.command == "remove":
+            return _remove(args.name, manifest_path, lock_path, home)
         if args.command == "sync":
             return _sync(manifest_path, lock_path, home)
         if args.command == "list":
@@ -44,23 +51,47 @@ def main(argv: list[str] | None = None) -> int:
     return 0
 
 
-def _install(plugin: str | None, manifest_path: Path, lock_path: Path, home: Path) -> int:
-    if plugin:
-        name = _name_from_plugin(plugin)
-        specs = [parse_plugin(name, plugin)]
-    else:
-        manifest = load_manifest(manifest_path)
-        specs = [
-            resolve_manifest_path_spec(spec, manifest.path.parent)
-            for spec in manifest.plugins.values()
-        ]
+def _add(
+    name: str,
+    source: str | None,
+    path: str | None,
+    manifest_path: Path,
+    lock_path: Path,
+    home: Path,
+) -> int:
+    _ensure_clean_manifest_lock(manifest_path, lock_path)
+    manifest = _load_or_empty_manifest(manifest_path)
+    if source and path:
+        print("bnpm: add accepts either <source> or --path, not both", file=sys.stderr)
+        return 1
+    if not source and not path:
+        print("bnpm: add requires <source> or --path", file=sys.stderr)
+        return 1
 
-    installed = [install(spec, home) for spec in specs]
-    lockfile = load_lockfile(lock_path)
-    write_lockfile(lock_path, merge_plugins(lockfile.plugins, installed))
-    for plugin in installed:
-        print(f"installed {plugin.name} {plugin.version or 'local'} {plugin.commit or plugin.source}")
-    return 0
+    if path:
+        absolute_path = Path(path).expanduser().resolve()
+        spec = parse_plugin(name, {"path": str(absolute_path)})
+    else:
+        assert source is not None
+        spec = parse_plugin(name, source)
+
+    plugins = dict(manifest.plugins)
+    plugins[name] = spec
+    write_manifest(manifest_path, plugins)
+    return _sync(manifest_path, lock_path, home)
+
+
+def _remove(name: str, manifest_path: Path, lock_path: Path, home: Path) -> int:
+    _ensure_clean_manifest_lock(manifest_path, lock_path)
+    manifest = load_manifest(manifest_path)
+    if name not in manifest.plugins:
+        print(f"bnpm: plugin {name!r} is not in bnpm.toml", file=sys.stderr)
+        return 1
+
+    plugins = dict(manifest.plugins)
+    del plugins[name]
+    write_manifest(manifest_path, plugins)
+    return _sync(manifest_path, lock_path, home)
 
 
 def _sync(manifest_path: Path, lock_path: Path, home: Path) -> int:
@@ -77,9 +108,26 @@ def _list(lock_path: Path) -> int:
     return 0
 
 
-def _name_from_plugin(value: str) -> str:
-    source = value.split("@", 1)[0].split("?", 1)[0].removesuffix(".git").rstrip("/")
-    return source.rsplit("/", 1)[-1].replace("-", "_")
+def _load_or_empty_manifest(manifest_path: Path) -> Manifest:
+    if manifest_path.exists():
+        return load_manifest(manifest_path)
+    return Manifest(path=manifest_path, version=1, plugins={})
+
+
+def _ensure_clean_manifest_lock(manifest_path: Path, lock_path: Path) -> None:
+    if not manifest_path.exists():
+        return
+    mismatches = lock_mismatches(
+        load_manifest_plugins(manifest_path),
+        load_lockfile(lock_path),
+    )
+    if not mismatches:
+        return
+    details = "\n".join(f"  - {message}" for message in mismatches)
+    raise BnpmError(
+        "bnpm.toml and bnpm.lock differ. Run `bnpm sync` before add/remove.\n"
+        + details
+    )
 
 
 if __name__ == "__main__":

@@ -11,14 +11,18 @@ BNPM targets Python 3.10+.
 ## Usage
 
 ```bash
-PYTHONPATH=src python -m bnpm.cli install github.com/owner/plugin@v1.2.3
+PYTHONPATH=src python -m bnpm.cli add plugin github.com/owner/plugin@v1.2.3
+PYTHONPATH=src python -m bnpm.cli add local --path ../local-plugin
+PYTHONPATH=src python -m bnpm.cli remove plugin
 PYTHONPATH=src python -m bnpm.cli sync
 PYTHONPATH=src python -m bnpm.cli list
 ```
 
 ```powershell
 $env:PYTHONPATH = "src"
-python -m bnpm.cli install github.com/owner/plugin@v1.2.3
+python -m bnpm.cli add plugin github.com/owner/plugin@v1.2.3
+python -m bnpm.cli add local --path ..\local-plugin
+python -m bnpm.cli remove plugin
 python -m bnpm.cli sync
 python -m bnpm.cli list
 ```

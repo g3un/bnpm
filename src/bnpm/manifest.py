@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
 from pathlib import Path
+import tempfile
 
 from .errors import ManifestError
 from .source import SourceSpec, parse_plugin
@@ -39,3 +41,52 @@ def load_manifest(path: Path) -> Manifest:
         for name, value in sorted(plugins_data.items())
     }
     return Manifest(path=path, version=version, plugins=plugins)
+
+
+def write_manifest(path: Path, plugins: dict[str, SourceSpec]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    content = _format_manifest(plugins)
+    with tempfile.NamedTemporaryFile(
+        "w",
+        encoding="utf-8",
+        dir=path.parent,
+        prefix=f".{path.name}.",
+        suffix=".tmp",
+        delete=False,
+    ) as handle:
+        temp_path = Path(handle.name)
+        handle.write(content)
+
+    try:
+        os.replace(temp_path, path)
+    except Exception:
+        temp_path.unlink(missing_ok=True)
+        raise
+
+
+def _format_manifest(plugins: dict[str, SourceSpec]) -> str:
+    lines = ["version = 1", "", "[plugins]"]
+    for name, spec in sorted(plugins.items()):
+        lines.append(f"{name} = {_format_plugin(spec)}")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def _format_plugin(spec: SourceSpec) -> str:
+    if spec.kind == "path":
+        assert spec.path is not None
+        return f'{{ path = "{_escape(spec.path)}" }}'
+
+    assert spec.git is not None
+    fields = [f'git = "{_escape(spec.git)}"']
+    if spec.tag:
+        fields.append(f'tag = "{_escape(spec.tag)}"')
+    if spec.branch:
+        fields.append(f'branch = "{_escape(spec.branch)}"')
+    if spec.rev:
+        fields.append(f'rev = "{_escape(spec.rev)}"')
+    return "{ " + ", ".join(fields) + " }"
+
+
+def _escape(value: str) -> str:
+    return value.replace("\\", "\\\\").replace('"', '\\"')

@@ -180,6 +180,91 @@ local = { path = "second" }
 
 
 class CliRuntimeTests(unittest.TestCase):
+    def test_add_path_writes_absolute_path_and_syncs(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            plugin = root / "plugin"
+            plugin.mkdir()
+            plugin.joinpath("__init__.py").write_text("", encoding="utf-8")
+            manifest = root / "bnpm.toml"
+
+            code = main(
+                [
+                    "--manifest-path",
+                    str(manifest),
+                    "--home",
+                    str(root / "home"),
+                    "add",
+                    "local",
+                    "--path",
+                    str(plugin),
+                ]
+            )
+
+            self.assertEqual(code, 0)
+            escaped_path = str(plugin.resolve()).replace("\\", "\\\\")
+            self.assertIn(
+                f'path = "{escaped_path}"',
+                manifest.read_text(encoding="utf-8"),
+            )
+            lockfile = load_lockfile(root / "bnpm.lock")
+            self.assertEqual(lockfile.plugins[0].name, "local")
+
+    def test_remove_updates_manifest_and_syncs(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            plugin = root / "plugin"
+            plugin.mkdir()
+            plugin.joinpath("__init__.py").write_text("", encoding="utf-8")
+            manifest = root / "bnpm.toml"
+            manifest.write_text(
+                f"""
+version = 1
+
+[plugins]
+local = {{ path = "{str(plugin).replace(chr(92), chr(92) * 2)}" }}
+""".strip(),
+                encoding="utf-8",
+            )
+            self.assertEqual(main(["--manifest-path", str(manifest), "--home", str(root / "home"), "sync"]), 0)
+
+            code = main(["--manifest-path", str(manifest), "--home", str(root / "home"), "remove", "local"])
+
+            self.assertEqual(code, 0)
+            self.assertEqual(load_manifest(manifest).plugins, {})
+            self.assertEqual(load_lockfile(root / "bnpm.lock").plugins, [])
+
+    def test_add_requires_sync_when_manifest_and_lock_differ(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            plugin = root / "plugin"
+            plugin.mkdir()
+            manifest = root / "bnpm.toml"
+            manifest.write_text(
+                """
+version = 1
+
+[plugins]
+stale = { path = "plugin" }
+""".strip(),
+                encoding="utf-8",
+            )
+
+            code = main(
+                [
+                    "--manifest-path",
+                    str(manifest),
+                    "--home",
+                    str(root / "home"),
+                    "add",
+                    "local",
+                    "--path",
+                    str(plugin),
+                ]
+            )
+
+            self.assertEqual(code, 1)
+
     def test_path_plugin_sync_and_runtime_load(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
