@@ -513,6 +513,39 @@ local = { path = "plugin" }
 
         self.assertEqual(path, Path.home().resolve())
 
+    def test_sync_resolves_relative_path_from_manifest_directory(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            config = root / "config"
+            plugin = root / "plugin"
+            cwd = root / "cwd"
+            config.mkdir()
+            plugin.mkdir()
+            cwd.mkdir()
+            plugin.joinpath("__init__.py").write_text("VALUE = 1\n", encoding="utf-8")
+            manifest = config / "bnpm.toml"
+            manifest.write_text(
+                """
+version = 1
+
+[plugins]
+local = { path = "../plugin" }
+""".strip(),
+                encoding="utf-8",
+            )
+            old_cwd = Path.cwd()
+            try:
+                os.chdir(cwd)
+
+                code = main(["--manifest-path", str(manifest), "--home", str(root / "home"), "sync"])
+            finally:
+                os.chdir(old_cwd)
+
+            locked = load_lockfile(config / "bnpm.lock").plugins
+            self.assertEqual(code, 0)
+            self.assertEqual(len(locked), 1)
+            self.assertEqual(locked[0].source, path_to_file_uri(plugin))
+
 
 if __name__ == "__main__":
     unittest.main()
