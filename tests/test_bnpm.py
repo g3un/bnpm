@@ -196,7 +196,6 @@ class CliRuntimeTests(unittest.TestCase):
                     str(root / "home"),
                     "add",
                     "local",
-                    "--path",
                     str(plugin),
                 ]
             )
@@ -282,7 +281,6 @@ stale = { path = "plugin" }
                     str(root / "home"),
                     "add",
                     "local",
-                    "--path",
                     str(plugin),
                 ]
             )

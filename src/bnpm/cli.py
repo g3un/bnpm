@@ -22,8 +22,7 @@ def main(argv: list[str] | None = None) -> int:
 
     add_parser = subparsers.add_parser("add")
     add_parser.add_argument("name")
-    add_parser.add_argument("source", nargs="?")
-    add_parser.add_argument("--path")
+    add_parser.add_argument("source")
 
     remove_parser = subparsers.add_parser("remove")
     remove_parser.add_argument("name")
@@ -38,7 +37,7 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         if args.command == "add":
-            return _add(args.name, args.source, args.path, manifest_path, lock_path, home)
+            return _add(args.name, args.source, manifest_path, lock_path, home)
         if args.command == "remove":
             return _remove(args.name, manifest_path, lock_path, home)
         if args.command == "sync":
@@ -53,31 +52,19 @@ def main(argv: list[str] | None = None) -> int:
 
 def _add(
     name: str,
-    source: str | None,
-    path: str | None,
+    source: str,
     manifest_path: Path,
     lock_path: Path,
     home: Path,
 ) -> int:
     _ensure_clean_manifest_lock(manifest_path, lock_path)
     manifest = _load_or_empty_manifest(manifest_path)
-    if source and path:
-        print("bnpm: add accepts either <source> or --path, not both", file=sys.stderr)
-        return 1
-    if not source and not path:
-        print("bnpm: add requires <source> or --path", file=sys.stderr)
-        return 1
 
-    if path:
-        absolute_path = Path(path).expanduser().resolve()
-        spec = parse_plugin(name, {"path": str(absolute_path)})
+    source_path = Path(source).expanduser()
+    if source_path.exists():
+        spec = parse_plugin(name, {"path": str(source_path.resolve())})
     else:
-        assert source is not None
-        source_path = Path(source).expanduser()
-        if source_path.exists():
-            spec = parse_plugin(name, {"path": str(source_path.resolve())})
-        else:
-            spec = parse_plugin(name, source)
+        spec = parse_plugin(name, source)
 
     plugins = dict(manifest.plugins)
     plugins[name] = spec
