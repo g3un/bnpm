@@ -48,6 +48,11 @@ plugin = "github.com/owner/plugin@v1.2.3"
 local = { path = "../local-plugin" }
 ```
 
+Relative `path` values are resolved from the directory containing `bnpm.toml`,
+not from the current working directory. `bnpm add` resolves local path arguments
+from the shell's current working directory and writes absolute paths back to
+`bnpm.toml`.
+
 ## Paths
 
 - Unix/macOS config: `~/.config/bnpm`
