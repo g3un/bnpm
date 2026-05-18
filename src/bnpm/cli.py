@@ -5,12 +5,13 @@ from pathlib import Path
 import sys
 
 from .errors import BnpmError
-from .lockfile import load_lockfile
+from .fetch import install
+from .lockfile import load_lockfile, merge_plugins, write_lockfile
 from .manifest import Manifest, load_manifest, write_manifest
 from .source import parse_plugin
 from .status import load_manifest_plugins, lock_mismatches
 from .store import default_home, default_manifest_path
-from .sync import sync
+from .sync import resolve_manifest_path_spec, sync
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -27,6 +28,9 @@ def main(argv: list[str] | None = None) -> int:
     remove_parser = subparsers.add_parser("remove")
     remove_parser.add_argument("name")
 
+    update_parser = subparsers.add_parser("update")
+    update_parser.add_argument("names", nargs="*")
+
     subparsers.add_parser("sync")
     subparsers.add_parser("list")
 
@@ -40,6 +44,8 @@ def main(argv: list[str] | None = None) -> int:
             return _add(args.name, args.source, manifest_path, lock_path, home)
         if args.command == "remove":
             return _remove(args.name, manifest_path, lock_path, home)
+        if args.command == "update":
+            return _update(args.names, manifest_path, lock_path, home)
         if args.command == "sync":
             return _sync(manifest_path, lock_path, home)
         if args.command == "list":
@@ -85,6 +91,26 @@ def _remove(name: str, manifest_path: Path, lock_path: Path, home: Path) -> int:
     return _sync(manifest_path, lock_path, home)
 
 
+def _update(names: list[str], manifest_path: Path, lock_path: Path, home: Path) -> int:
+    _ensure_clean_manifest_lock(manifest_path, lock_path)
+    manifest = load_manifest(manifest_path)
+    selected_names = names or list(manifest.plugins)
+    missing = sorted(set(selected_names) - set(manifest.plugins))
+    if missing:
+        print(f"bnpm: unknown plugin(s): {', '.join(missing)}", file=sys.stderr)
+        return 1
+
+    installed = [
+        install(resolve_manifest_path_spec(manifest.plugins[name], manifest.path.parent), home)
+        for name in selected_names
+    ]
+    lockfile = load_lockfile(lock_path)
+    write_lockfile(lock_path, merge_plugins(lockfile.plugins, installed))
+    for plugin in installed:
+        print(f"updated {plugin.name} {plugin.version or 'local'} {plugin.commit or plugin.source}")
+    return 0
+
+
 def _sync(manifest_path: Path, lock_path: Path, home: Path) -> int:
     installed = sync(manifest_path=manifest_path, lock_path=lock_path, home=home)
     for plugin in installed:
@@ -116,7 +142,7 @@ def _ensure_clean_manifest_lock(manifest_path: Path, lock_path: Path) -> None:
         return
     details = "\n".join(f"  - {message}" for message in mismatches)
     raise BnpmError(
-        "bnpm.toml and bnpm.lock differ. Run `bnpm sync` before add/remove.\n"
+        "bnpm.toml and bnpm.lock differ. Run `bnpm sync` before changing plugins.\n"
         + details
     )
 

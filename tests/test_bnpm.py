@@ -257,6 +257,56 @@ local = {{ path = "{str(plugin).replace(chr(92), chr(92) * 2)}" }}
             self.assertEqual(load_manifest(manifest).plugins, {})
             self.assertEqual(load_lockfile(root / "bnpm.lock").plugins, [])
 
+    def test_update_refreshes_selected_plugin_lock_entry(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            first = root / "first"
+            second = root / "second"
+            first.mkdir()
+            second.mkdir()
+            first.joinpath("__init__.py").write_text("VALUE = 1\n", encoding="utf-8")
+            second.joinpath("__init__.py").write_text("VALUE = 2\n", encoding="utf-8")
+            manifest = root / "bnpm.toml"
+            manifest.write_text(
+                f"""
+version = 1
+
+[plugins]
+first = {{ path = "{str(first).replace(chr(92), chr(92) * 2)}" }}
+second = {{ path = "{str(second).replace(chr(92), chr(92) * 2)}" }}
+""".strip(),
+                encoding="utf-8",
+            )
+            self.assertEqual(main(["--manifest-path", str(manifest), "--home", str(root / "home"), "sync"]), 0)
+            before = {plugin.name: plugin.checksum for plugin in load_lockfile(root / "bnpm.lock").plugins}
+            first.joinpath("__init__.py").write_text("VALUE = 10\n", encoding="utf-8")
+            second.joinpath("__init__.py").write_text("VALUE = 20\n", encoding="utf-8")
+
+            code = main(["--manifest-path", str(manifest), "--home", str(root / "home"), "update", "first"])
+
+            after = {plugin.name: plugin.checksum for plugin in load_lockfile(root / "bnpm.lock").plugins}
+            self.assertEqual(code, 0)
+            self.assertNotEqual(after["first"], before["first"])
+            self.assertEqual(after["second"], before["second"])
+
+    def test_update_rejects_unknown_plugin(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            manifest = root / "bnpm.toml"
+            manifest.write_text(
+                """
+version = 1
+
+[plugins]
+""".strip(),
+                encoding="utf-8",
+            )
+            self.assertEqual(main(["--manifest-path", str(manifest), "--home", str(root / "home"), "sync"]), 0)
+
+            code = main(["--manifest-path", str(manifest), "--home", str(root / "home"), "update", "missing"])
+
+            self.assertEqual(code, 1)
+
     def test_add_requires_sync_when_manifest_and_lock_differ(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
