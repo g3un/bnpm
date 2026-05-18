@@ -410,6 +410,26 @@ local = { path = "plugin" }
             self.assertTrue(uri.startswith("file://"))
             self.assertEqual(file_uri_to_path(uri), path)
 
+    def test_managed_git_dir_rejects_path_traversal(self):
+        with tempfile.TemporaryDirectory() as temp:
+            with self.assertRaises(ValueError):
+                managed_git_dir(
+                    Path(temp),
+                    "https://github.com/user/../../evil.git",
+                    "abc123",
+                )
+
+    def test_managed_git_dir_handles_ssh_sources(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path = managed_git_dir(
+                Path(temp),
+                "git@github.com:user/repo.git",
+                "abc123",
+            )
+
+        self.assertEqual(path.name, "abc123")
+        self.assertIn("github.com", path.parts)
+
 
 if __name__ == "__main__":
     unittest.main()

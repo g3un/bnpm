@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 import platform
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from urllib.parse import urlparse
 from urllib.request import url2pathname
 
@@ -75,11 +75,34 @@ def plugin_dir_from_lock(home: Path, source: str, commit: str | None) -> Path:
 
 
 def managed_git_dir(home: Path, source: str, commit: str) -> Path:
-    clean = source
-    for prefix in ("https://", "http://", "git@"):
-        clean = clean.removeprefix(prefix)
-    clean = clean.replace(":", "/").removesuffix(".git").strip("/")
-    return home / clean / commit
+    parts = _managed_git_parts(source)
+    target = home.joinpath(*parts, commit).resolve()
+    home = home.resolve()
+    if not target.is_relative_to(home):
+        raise ValueError(f"managed plugin path escapes BNPM home: {source}")
+    return target
+
+
+def _managed_git_parts(source: str) -> list[str]:
+    parsed = urlparse(_normalize_git_source_for_parse(source))
+    if not parsed.netloc:
+        raise ValueError(f"git source is missing host: {source}")
+
+    path = parsed.path.removesuffix(".git")
+    parts = [parsed.netloc, *PurePosixPath(path).parts]
+    clean = [part for part in parts if part not in {"", "/"}]
+    if any(part in {".", ".."} for part in clean):
+        raise ValueError(f"git source contains unsafe path segment: {source}")
+    if len(clean) < 3:
+        raise ValueError(f"git source path is too short: {source}")
+    return clean
+
+
+def _normalize_git_source_for_parse(source: str) -> str:
+    if source.startswith("git@"):
+        host_and_path = source.removeprefix("git@").replace(":", "/", 1)
+        return f"ssh://{host_and_path}"
+    return source
 
 
 def path_to_file_uri(path: Path) -> str:
