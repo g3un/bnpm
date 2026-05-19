@@ -10,7 +10,8 @@ A modern plugin manager for Binary Ninja:
 Install the CLI with `uv`:
 
 ```bash
-uv tool install git+https://github.com/g3un/bnpm
+uv tool install git+https://codeberg.org/g3un/bnpm
+# Install BNPM itself as a Binary Ninja plugin.
 bnpm setup
 ```
 
@@ -27,6 +28,7 @@ bnpm list
 Run BNPM without installing it with `uvx`:
 
 ```bash
-uvx --from git+https://github.com/g3un/bnpm bnpm setup
-uvx --from git+https://github.com/g3un/bnpm bnpm list
+# Install BNPM itself as a Binary Ninja plugin.
+uvx --from git+https://codeberg.org/g3un/bnpm bnpm setup
+uvx --from git+https://codeberg.org/g3un/bnpm bnpm list
 ```
