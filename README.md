@@ -2,8 +2,7 @@
 
 A modern plugin manager for Binary Ninja:
 - Install plugins directly from trusted Git URLs or local paths.
-- Support more plugin project shapes over time, including Rust-based plugins
-  and `uv`-managed Python projects.
+- Support common Python plugin layouts, including `pyproject.toml`.
 
 ## Usage
 

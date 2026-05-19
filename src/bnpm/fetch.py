@@ -8,9 +8,9 @@ from pathlib import Path
 from .errors import FetchError
 from .hash import tree_sha256
 from .lockfile import LockedPlugin
+from .plugin_types import legacy_python, pyproject
 from .source import SourceSpec
 from .store import install_dir, path_to_file_uri
-from .toml_compat import load_toml
 
 
 def install(spec: SourceSpec, home: Path, progress=None) -> LockedPlugin:
@@ -92,34 +92,12 @@ def _read_requirements(plugin_path: Path, progress=None) -> list[str]:
     if pyproject_path.exists():
         if requirements_path.exists():
             _progress(progress, f"ignored {requirements_path}: pyproject.toml is present")
-        return _read_pyproject_dependencies(pyproject_path)
+        return pyproject.read_project_dependencies(pyproject_path)
 
     if not requirements_path.exists():
         return []
 
-    dependencies = []
-    for line in requirements_path.read_text(encoding="utf-8").splitlines():
-        requirement = line.strip()
-        if not requirement or requirement.startswith("#"):
-            continue
-        dependencies.append(requirement)
-    return dependencies
-
-
-def _read_pyproject_dependencies(path: Path) -> list[str]:
-    try:
-        data = load_toml(path)
-    except ValueError as exc:
-        raise FetchError(f"invalid pyproject.toml: {exc}") from exc
-    project = data.get("project", {})
-    if not isinstance(project, dict):
-        return []
-    dependencies = project.get("dependencies", [])
-    if dependencies is None:
-        return []
-    if not isinstance(dependencies, list) or not all(isinstance(item, str) for item in dependencies):
-        raise FetchError("[project].dependencies must be a list of strings")
-    return dependencies
+    return legacy_python.read_requirements_txt(requirements_path)
 
 
 def _progress(progress, message: str) -> None:
