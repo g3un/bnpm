@@ -7,7 +7,7 @@ import shutil
 IGNORED_NAMES = {"__pycache__", ".pytest_cache", ".ruff_cache"}
 
 
-def build_bundle(output: Path) -> Path:
+def install_plugin_files(output: Path) -> Path:
     output = output.expanduser().resolve()
     _recreate_dir(output)
     _copy_plugin_resource("plugin_init.py", output / "__init__.py")

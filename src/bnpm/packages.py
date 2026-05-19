@@ -60,14 +60,12 @@ def _install_requirements(requirements_path: Path, target: Path) -> None:
 
 
 def _run_uv_install(requirements_path: Path, target: Path) -> None:
-    python = _python_executable()
     result = subprocess.run(
         [
             "uv",
             "pip",
             "install",
-            "--python",
-            python,
+            *_uv_target_options(),
             "--target",
             str(target),
             "--reinstall",
@@ -171,6 +169,10 @@ def _configured_python() -> Path | None:
         if path.exists():
             return path
     return None
+
+
+def _uv_target_options() -> list[str]:
+    return ["--python-version", "3.10"]
 
 
 def _packages_from_target(target: Path) -> list[LockedPackage]:

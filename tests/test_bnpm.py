@@ -11,7 +11,7 @@ from pathlib import Path
 import unittest
 from unittest.mock import Mock, patch
 
-from bnpm.bundle import build_bundle
+from bnpm.installer import install_plugin_files
 from bnpm.cli import main
 from bnpm.lockfile import LockedPackage, LockedPlugin, load_lockfile, write_lockfile
 from bnpm.manifest import load_manifest
@@ -289,7 +289,7 @@ class CliRuntimeTests(unittest.TestCase):
             lockfile = load_lockfile(root / "bnpm.lock")
             self.assertEqual(lockfile.plugins[0].name, "local")
 
-    def test_setup_installs_binaryninja_plugin_bundle(self):
+    def test_setup_installs_binaryninja_plugin_files(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             plugin_dir = root / "plugins"
@@ -507,16 +507,17 @@ local = {{ path = "{str(plugin).replace(chr(92), chr(92) * 2)}" }}
             run = Mock(return_value=types.SimpleNamespace(returncode=0, stdout="", stderr=""))
 
             with patch("bnpm.packages.subprocess.run", run), patch(
-                "bnpm.packages._python_executable",
-                return_value="/path/to/binaryninja/python3",
+                "bnpm.packages._uv_target_options",
+                return_value=["--python-version", "3.10"],
             ):
                 _install_requirements(requirements, target)
 
             self.assertEqual(run.call_count, 1)
             args = run.call_args.args[0]
             self.assertEqual(args[:3], ["uv", "pip", "install"])
-            self.assertIn("--python", args)
-            self.assertEqual(args[args.index("--python") + 1], "/path/to/binaryninja/python3")
+            self.assertIn("--python-version", args)
+            self.assertEqual(args[args.index("--python-version") + 1], "3.10")
+            self.assertNotIn("--python-platform", args)
             self.assertIn("--target", args)
             self.assertEqual(args[args.index("--target") + 1], str(target))
             self.assertIn(str(requirements), args)
@@ -1118,7 +1119,7 @@ local = { path = "../plugin" }
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             plugin_root = root / "bnpm"
-            build_bundle(plugin_root)
+            install_plugin_files(plugin_root)
 
             binaryninja = types.ModuleType("binaryninja")
             binaryninja.PluginCommand = type(

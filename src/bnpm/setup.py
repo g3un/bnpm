@@ -5,7 +5,7 @@ import platform
 import shutil
 from pathlib import Path
 
-from .bundle import build_bundle
+from .installer import install_plugin_files
 from .errors import BnpmError
 
 
@@ -13,7 +13,7 @@ def setup_binaryninja(plugin_dir: Path | None = None) -> Path:
     plugin_dir = plugin_dir.expanduser().resolve() if plugin_dir else default_binaryninja_plugin_dir()
     target = plugin_dir / "bnpm"
     plugin_dir.mkdir(parents=True, exist_ok=True)
-    return build_bundle(target)
+    return install_plugin_files(target)
 
 
 def default_binaryninja_plugin_dir() -> Path:
