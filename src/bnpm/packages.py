@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 from importlib import metadata
+import os
 import re
 import shutil
 import subprocess
@@ -11,6 +12,7 @@ from pathlib import Path
 
 from .errors import BnpmError
 from .lockfile import LockedPackage, LockedPlugin
+from .setup import default_binaryninja_python
 from .store import package_dir
 
 REQ_NAME_RE = re.compile(r"\s*([A-Za-z0-9][A-Za-z0-9._-]*)")
@@ -58,11 +60,14 @@ def _install_requirements(requirements_path: Path, target: Path) -> None:
 
 
 def _run_uv_install(requirements_path: Path, target: Path) -> None:
+    python = _python_executable()
     result = subprocess.run(
         [
             "uv",
             "pip",
             "install",
+            "--python",
+            python,
             "--target",
             str(target),
             "--reinstall",
@@ -143,6 +148,12 @@ def _ensure_pip() -> None:
 
 
 def _python_executable() -> str:
+    configured = _configured_python()
+    if configured is not None:
+        return str(configured)
+    binaryninja_python = default_binaryninja_python()
+    if binaryninja_python is not None:
+        return str(binaryninja_python)
     binaryninja_python = Path(sys.prefix) / "bin" / "python3"
     if binaryninja_python.exists():
         return str(binaryninja_python)
@@ -151,6 +162,15 @@ def _python_executable() -> str:
         if path is not None:
             return path
     return sys.executable
+
+
+def _configured_python() -> Path | None:
+    override = os.environ.get("BNPM_BINARYNINJA_PYTHON")
+    if override:
+        path = Path(override).expanduser().resolve()
+        if path.exists():
+            return path
+    return None
 
 
 def _packages_from_target(target: Path) -> list[LockedPackage]:

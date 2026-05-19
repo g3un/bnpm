@@ -15,9 +15,9 @@ from bnpm.bundle import build_bundle
 from bnpm.cli import main
 from bnpm.lockfile import LockedPackage, LockedPlugin, load_lockfile, write_lockfile
 from bnpm.manifest import load_manifest
-from bnpm.packages import _install_requirements
+from bnpm.packages import _install_requirements, _python_executable
 from bnpm.runtime import activate
-from bnpm.setup import default_binaryninja_plugin_dir
+from bnpm.setup import default_binaryninja_plugin_dir, default_binaryninja_python
 from bnpm.source import SourceSpec, parse_plugin
 from bnpm.status import load_manifest_plugins, lock_mismatches
 from bnpm.store import (
@@ -309,6 +309,48 @@ class CliRuntimeTests(unittest.TestCase):
             with patch.dict(os.environ, {"BNPM_BINARYNINJA_PLUGIN_DIR": str(root)}):
                 self.assertEqual(default_binaryninja_plugin_dir(), root)
 
+    def test_default_binaryninja_plugin_dir_uses_bn_user_directory(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp).resolve()
+            with patch.dict(os.environ, {"BN_USER_DIRECTORY": str(root), "BNPM_BINARYNINJA_PLUGIN_DIR": ""}):
+                self.assertEqual(default_binaryninja_plugin_dir(), root / "plugins")
+
+    def test_default_binaryninja_python_uses_windows_user_install(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp).resolve()
+            local_appdata = root / "LocalAppData"
+            python = local_appdata / "Vector35" / "BinaryNinja" / "plugins" / "python" / "python.exe"
+            python.parent.mkdir(parents=True)
+            python.write_text("", encoding="utf-8")
+
+            with patch("bnpm.setup.platform.system", return_value="Windows"), patch.dict(
+                os.environ,
+                {
+                    "APPDATA": str(root / "AppData"),
+                    "LOCALAPPDATA": str(local_appdata),
+                    "BNPM_BINARYNINJA_PYTHON": "",
+                    "BN_USER_DIRECTORY": "",
+                },
+            ):
+                self.assertEqual(default_binaryninja_python(), python)
+
+    def test_default_binaryninja_python_uses_lastrun_on_linux(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp).resolve()
+            user_dir = root / "user"
+            install_root = root / "binaryninja"
+            python = install_root / "python3"
+            user_dir.mkdir()
+            install_root.mkdir()
+            python.write_text("", encoding="utf-8")
+            user_dir.joinpath("lastrun").write_text(str(install_root), encoding="utf-8")
+
+            with patch("bnpm.setup.platform.system", return_value="Linux"), patch.dict(
+                os.environ,
+                {"BN_USER_DIRECTORY": str(user_dir), "BNPM_BINARYNINJA_PYTHON": ""},
+            ), patch("bnpm.setup.shutil.which", return_value=None):
+                self.assertEqual(default_binaryninja_python(), python)
+
     def test_add_path_locks_resolved_dependencies(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -464,12 +506,17 @@ local = {{ path = "{str(plugin).replace(chr(92), chr(92) * 2)}" }}
             requirements.write_text("requests\n", encoding="utf-8")
             run = Mock(return_value=types.SimpleNamespace(returncode=0, stdout="", stderr=""))
 
-            with patch("bnpm.packages.subprocess.run", run):
+            with patch("bnpm.packages.subprocess.run", run), patch(
+                "bnpm.packages._python_executable",
+                return_value="/path/to/binaryninja/python3",
+            ):
                 _install_requirements(requirements, target)
 
             self.assertEqual(run.call_count, 1)
             args = run.call_args.args[0]
             self.assertEqual(args[:3], ["uv", "pip", "install"])
+            self.assertIn("--python", args)
+            self.assertEqual(args[args.index("--python") + 1], "/path/to/binaryninja/python3")
             self.assertIn("--target", args)
             self.assertEqual(args[args.index("--target") + 1], str(target))
             self.assertIn(str(requirements), args)
@@ -490,6 +537,9 @@ local = {{ path = "{str(plugin).replace(chr(92), chr(92) * 2)}" }}
             with patch("bnpm.packages.subprocess.run", run), patch(
                 "bnpm.packages.shutil.which",
                 side_effect=lambda name: "/usr/bin/python3" if name == "python3" else None,
+            ), patch("bnpm.packages.default_binaryninja_python", return_value=None), patch(
+                "bnpm.packages.sys.executable",
+                "/usr/bin/python3",
             ), patch("bnpm.packages.sys.prefix", str(root / "missing-prefix")):
                 _install_requirements(requirements, target)
 
@@ -499,6 +549,15 @@ local = {{ path = "{str(plugin).replace(chr(92), chr(92) * 2)}" }}
             self.assertEqual(args[1:5], ["-m", "pip", "--isolated", "install"])
             self.assertIn("--target", args)
             self.assertEqual(args[args.index("--target") + 1], str(target))
+
+    def test_package_install_uses_detected_binaryninja_python(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            python = root / "python3"
+            python.write_text("", encoding="utf-8")
+
+            with patch("bnpm.packages.default_binaryninja_python", return_value=python.resolve()):
+                self.assertEqual(_python_executable(), str(python.resolve()))
 
     def test_add_path_treats_it_as_path_plugin(self):
         with tempfile.TemporaryDirectory() as temp:
