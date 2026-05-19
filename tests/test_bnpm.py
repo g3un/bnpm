@@ -620,6 +620,10 @@ local = {{ path = "{str(plugin).replace(chr(92), chr(92) * 2)}" }}
             self.assertEqual(code, 0)
             self.assertEqual(spec.branch, "main")
             self.assertEqual(locked.version, "branch:main")
+            self.assertEqual(
+                plugin_dir(root / "home", "devtools", "abc123"),
+                (root / "home" / "devtools" / "abc123").resolve(),
+            )
 
     def test_add_local_path_rejects_ref_options(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -712,7 +716,7 @@ local = {{ path = "{str(plugin).replace(chr(92), chr(92) * 2)}" }}
             packages.mkdir(parents=True)
             source = "https://github.com/user/plugin.git"
             commit = "abc123"
-            plugin = plugin_dir(home, source, commit)
+            plugin = plugin_dir(home, "plugin", commit)
             plugin.mkdir(parents=True)
             plugin.joinpath("__init__.py").write_text("", encoding="utf-8")
             manifest = root / "bnpm.toml"
@@ -946,9 +950,8 @@ tool_bnpm = { path = "plugin" }
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             home = root / "home"
-            source = "https://github.com/user/plugin.git"
             commit = "abc123"
-            plugin = plugin_dir(home, source, commit)
+            plugin = plugin_dir(home, "bad", commit)
             plugin.mkdir(parents=True)
             marker = root / "loaded.txt"
             plugin.joinpath("__init__.py").write_text(
@@ -961,7 +964,7 @@ tool_bnpm = { path = "plugin" }
                 [
                     LockedPlugin(
                         name="bad",
-                        source=source,
+                        source="https://github.com/user/plugin.git",
                         version="HEAD",
                         checksum="sha256:not-the-real-hash",
                         commit=commit,
@@ -1030,48 +1033,32 @@ tool_bnpm = { path = "plugin" }
             self.assertTrue(uri.startswith("file://"))
             self.assertEqual(file_uri_to_path(uri), path)
 
-    def test_plugin_dir_encodes_dot_segments(self):
+    def test_plugin_dir_encodes_plugin_name(self):
         with tempfile.TemporaryDirectory() as temp:
             home = Path(temp)
-            path = plugin_dir(
-                home,
-                "https://github.com/user/../../evil.git",
-                "abc123",
-            )
+            path = plugin_dir(home, "user/../../evil", "abc123")
 
-        self.assertIn("%2E%2E", path.parts)
+        self.assertIn("user%2F..%2F..%2Fevil", path.parts)
         self.assertTrue(path.is_relative_to(home.resolve()))
 
-    def test_plugin_dir_handles_ssh_sources(self):
+    def test_plugin_dir_uses_plugin_name(self):
         with tempfile.TemporaryDirectory() as temp:
-            path = plugin_dir(
-                Path(temp),
-                "git@github.com:user/repo.git",
-                "abc123",
-        )
+            path = plugin_dir(Path(temp), "registered-name", "abc123")
 
         self.assertEqual(path.name, "abc123")
-        self.assertIn("github%2Ecom", path.parts)
+        self.assertEqual(path.parent.name, "registered-name")
 
-    def test_plugin_dir_encodes_path_segments(self):
+    def test_plugin_dir_encodes_colons(self):
         with tempfile.TemporaryDirectory() as temp:
-            path = plugin_dir(
-                Path(temp),
-                "https://git.example.com/user/repo:name.git",
-                "abc123",
-            )
+            path = plugin_dir(Path(temp), "repo:name", "abc123")
 
         self.assertIn("repo%3Aname", path.parts)
 
-    def test_plugin_dir_handles_tilde_and_backslash_segments(self):
+    def test_plugin_dir_encodes_backslash(self):
         with tempfile.TemporaryDirectory() as temp:
-            path = plugin_dir(
-                Path(temp),
-                "https://git.example.com/user/repo~name\\extra.git",
-                "abc123",
-            )
+            path = plugin_dir(Path(temp), "repo~name\\extra", "abc123")
 
-        self.assertIn("repo%7Ename%5Cextra", path.parts)
+        self.assertIn("repo~name%5Cextra", path.parts)
 
     def test_path_install_dir_expands_user_home(self):
         path = install_dir(

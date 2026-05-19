@@ -203,7 +203,7 @@ def _progress(message: str) -> None:
 def _remove_plugin(plugin: LockedPlugin, home: Path) -> None:
     if plugin.commit is None:
         return
-    path = plugin_dir_from_lock(home, plugin.source, plugin.commit)
+    path = plugin_dir_from_lock(home, plugin.name, plugin.source, plugin.commit)
     home = home.resolve()
     if not path.exists() or not path.is_relative_to(home):
         return

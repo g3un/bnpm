@@ -27,7 +27,7 @@ def activate(lock_path: Path | None = None, home: Path | None = None) -> None:
 
     for plugin in lockfile.plugins:
         _log_info(f"resolving {plugin.name} from {plugin.source}")
-        plugin_path = _resolve_plugin_path(home, plugin.source, plugin.commit)
+        plugin_path = _resolve_plugin_path(home, plugin.name, plugin.source, plugin.commit)
         if plugin_path is None:
             continue
         if not _verify_checksum(plugin.name, plugin_path, plugin.commit is None, plugin.checksum):
@@ -111,9 +111,9 @@ def _is_positive_message_box_result(result, result_type=None) -> bool:
     return name in {"YesButton", "OKButton"}
 
 
-def _resolve_plugin_path(home: Path, source: str, commit: str | None) -> Path | None:
+def _resolve_plugin_path(home: Path, name: str, source: str, commit: str | None) -> Path | None:
     try:
-        return plugin_dir_from_lock(home, source, commit)
+        return plugin_dir_from_lock(home, name, source, commit)
     except ValueError as exc:
         _log_warning(f"skipped plugin: {exc}")
         return None
