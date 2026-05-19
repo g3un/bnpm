@@ -15,6 +15,13 @@ uv tool install git+https://codeberg.org/g3un/bnpm
 bnpm setup
 ```
 
+Upgrade BNPM later:
+
+```bash
+uv tool upgrade bnpm --reinstall
+bnpm setup
+```
+
 ```bash
 bnpm add plugin --git github.com/owner/plugin --tag v1.2.3
 bnpm add devtools --git github.com/owner/devtools --branch main
