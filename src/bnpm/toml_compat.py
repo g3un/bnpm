@@ -6,10 +6,7 @@ from typing import Any
 try:
     import tomllib
 except ModuleNotFoundError:  # pragma: no cover
-    try:
-        import tomli as tomllib  # type: ignore[no-redef]
-    except ModuleNotFoundError:  # pragma: no cover
-        tomllib = None  # type: ignore[assignment]
+    tomllib = None  # type: ignore[assignment]
 
 
 def load_toml(path: Path) -> dict[str, Any]:
@@ -24,7 +21,11 @@ def _parse_subset(text: str) -> dict[str, Any]:
     current: dict[str, Any] = data
     current_array: list[dict[str, Any]] | None = None
 
-    for raw_line in text.splitlines():
+    lines = text.splitlines()
+    index = 0
+    while index < len(lines):
+        raw_line = lines[index]
+        index += 1
         line = _strip_comment(raw_line).strip()
         if not line:
             continue
@@ -33,7 +34,8 @@ def _parse_subset(text: str) -> dict[str, Any]:
             name = line[2:-2].strip()
             if not name:
                 raise ValueError("empty TOML array table name")
-            array = data.setdefault(name, [])
+            parent, key_name = _table_parent(data, name)
+            array = parent.setdefault(key_name, [])
             if not isinstance(array, list):
                 raise ValueError(f"TOML key {name!r} is not an array")
             table: dict[str, Any] = {}
@@ -46,7 +48,8 @@ def _parse_subset(text: str) -> dict[str, Any]:
             name = line[1:-1].strip()
             if not name:
                 raise ValueError("empty TOML table name")
-            table = data.setdefault(name, {})
+            parent, key_name = _table_parent(data, name)
+            table = parent.setdefault(key_name, {})
             if not isinstance(table, dict):
                 raise ValueError(f"TOML key {name!r} is not a table")
             current = table
@@ -59,16 +62,35 @@ def _parse_subset(text: str) -> dict[str, Any]:
         key = key.strip()
         if not key:
             raise ValueError(f"invalid TOML key: {raw_line}")
+        raw_value = value.strip()
+        if raw_value == "[":
+            raw_value, index = _collect_multiline_array(lines, index)
         if current_array is None and key in current:
             raise ValueError(f"duplicate TOML key: {key}")
-        current[key] = _parse_value(value.strip())
+        current[key] = _parse_value(raw_value)
 
     return data
+
+
+def _collect_multiline_array(lines: list[str], start: int) -> tuple[str, int]:
+    values = []
+    index = start
+    while index < len(lines):
+        line = _strip_comment(lines[index]).strip()
+        index += 1
+        if not line:
+            continue
+        if line == "]":
+            return f"[{', '.join(values)}]", index
+        values.append(line.removesuffix(",").strip())
+    raise ValueError("unterminated TOML array")
 
 
 def _parse_value(value: str) -> Any:
     if value.startswith('"') and value.endswith('"'):
         return _parse_string(value)
+    if value.startswith("[") and value.endswith("]"):
+        return _parse_array(value)
     if value.startswith("{") and value.endswith("}"):
         return _parse_inline_table(value)
     if value.isdigit():
@@ -92,6 +114,13 @@ def _parse_inline_table(value: str) -> dict[str, Any]:
     return table
 
 
+def _parse_array(value: str) -> list[Any]:
+    inner = value[1:-1].strip()
+    if not inner:
+        return []
+    return [_parse_value(item.strip()) for item in _split_commas(inner)]
+
+
 def _parse_string(value: str) -> str:
     result = []
     escaped = False
@@ -107,6 +136,19 @@ def _parse_string(value: str) -> str:
     if escaped:
         raise ValueError("unterminated TOML string escape")
     return "".join(result)
+
+
+def _table_parent(data: dict[str, Any], name: str) -> tuple[dict[str, Any], str]:
+    parts = [part.strip() for part in name.split(".")]
+    if not parts or any(not part for part in parts):
+        raise ValueError(f"invalid TOML table name: {name}")
+    current = data
+    for part in parts[:-1]:
+        value = current.setdefault(part, {})
+        if not isinstance(value, dict):
+            raise ValueError(f"TOML key {part!r} is not a table")
+        current = value
+    return current, parts[-1]
 
 
 def _split_commas(value: str) -> list[str]:

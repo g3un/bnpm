@@ -9,7 +9,7 @@ _PACKED_PACKAGE = _ROOT / "bnpm"
 if _PACKED_PACKAGE.is_dir() and str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 if _PACKED_PACKAGE.is_dir() and "__path__" in globals():
-    __path__.append(str(_PACKED_PACKAGE))
+    globals()["__path__"].append(str(_PACKED_PACKAGE))
 
 
 try:

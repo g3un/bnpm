@@ -7,18 +7,26 @@ A modern plugin manager for Binary Ninja:
 
 ## Usage
 
+Install the CLI with `uv`:
+
 ```bash
-uv run bnpm add plugin --git github.com/owner/plugin --tag v1.2.3
-uv run bnpm add devtools --git github.com/owner/devtools --branch main
-uv run bnpm add local --path ../local-plugin
-uv run bnpm remove plugin
-uv run bnpm update [plugin]
-uv run bnpm sync
-uv run bnpm list
+uv tool install git+https://github.com/g3un/bnpm
+bnpm setup
 ```
 
-Run BNPM directly from a Git checkout with `uvx`:
+```bash
+bnpm add plugin --git github.com/owner/plugin --tag v1.2.3
+bnpm add devtools --git github.com/owner/devtools --branch main
+bnpm add local --path ../local-plugin
+bnpm remove plugin
+bnpm update [plugin]
+bnpm sync
+bnpm list
+```
+
+Run BNPM without installing it with `uvx`:
 
 ```bash
+uvx --from git+https://github.com/g3un/bnpm bnpm setup
 uvx --from git+https://github.com/g3un/bnpm bnpm list
 ```

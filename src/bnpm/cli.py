@@ -11,6 +11,7 @@ from .fetch import install
 from .lockfile import LockedPlugin, load_lockfile, merge_plugins, write_lockfile
 from .manifest import Manifest, load_manifest, write_manifest
 from .packages import install_packages, lock_dependencies
+from .setup import setup_binaryninja
 from .source import SourceSpec, parse_plugin
 from .status import load_manifest_plugins, lock_mismatches
 from .store import default_home, default_manifest_path, plugin_dir_from_lock
@@ -42,6 +43,8 @@ def main(argv: list[str] | None = None) -> int:
 
     subparsers.add_parser("sync")
     subparsers.add_parser("list")
+    setup_parser = subparsers.add_parser("setup")
+    setup_parser.add_argument("--plugin-dir", default=None)
 
     args = parser.parse_args(argv)
     manifest_path = Path(args.manifest_path).expanduser().resolve() if args.manifest_path else default_manifest_path()
@@ -69,6 +72,8 @@ def main(argv: list[str] | None = None) -> int:
             return _sync(manifest_path, lock_path, home)
         if args.command == "list":
             return _list(lock_path)
+        if args.command == "setup":
+            return _setup(Path(args.plugin_dir) if args.plugin_dir else None)
     except BnpmError as exc:
         print(f"bnpm: {exc}", file=sys.stderr)
         return 1
@@ -174,6 +179,13 @@ def _list(lock_path: Path) -> int:
     lockfile = load_lockfile(lock_path)
     for plugin in sorted(lockfile.plugins, key=lambda item: item.name):
         print(f"{plugin.name}\t{plugin.version or 'local'}\t{plugin.commit or plugin.source}")
+    return 0
+
+
+def _setup(plugin_dir: Path | None) -> int:
+    target = setup_binaryninja(plugin_dir)
+    print(f"installed BNPM Binary Ninja plugin to {target}")
+    print("restart Binary Ninja to load BNPM")
     return 0
 
 

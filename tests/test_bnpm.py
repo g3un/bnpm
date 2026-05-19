@@ -4,7 +4,6 @@ import importlib.util
 import os
 import contextlib
 import io
-import shutil
 import sys
 import tempfile
 import types
@@ -12,11 +11,13 @@ from pathlib import Path
 import unittest
 from unittest.mock import Mock, patch
 
+from bnpm.bundle import build_bundle
 from bnpm.cli import main
 from bnpm.lockfile import LockedPackage, LockedPlugin, load_lockfile, write_lockfile
 from bnpm.manifest import load_manifest
 from bnpm.packages import _install_requirements
 from bnpm.runtime import activate
+from bnpm.setup import default_binaryninja_plugin_dir
 from bnpm.source import SourceSpec, parse_plugin
 from bnpm.status import load_manifest_plugins, lock_mismatches
 from bnpm.store import (
@@ -101,6 +102,24 @@ devtools = { git = "https://github.com/user/devtools.git", branch = "main" }
 
         self.assertEqual(data["version"], 1)
         self.assertEqual(data["plugins"]["devtools"]["branch"], "main")
+
+    def test_toml_subset_parser_supports_pyproject_shape(self):
+        data = _parse_subset(
+            """
+[project]
+name = "sample-plugin"
+dependencies = ["requests>=2.31,<3"]
+
+[tool.bnpm]
+package = "actual_package"
+source = "src"
+""".strip()
+        )
+
+        self.assertEqual(data["project"]["name"], "sample-plugin")
+        self.assertEqual(data["project"]["dependencies"], ["requests>=2.31,<3"])
+        self.assertEqual(data["tool"]["bnpm"]["package"], "actual_package")
+        self.assertEqual(data["tool"]["bnpm"]["source"], "src")
 
 
 class LockfileTests(unittest.TestCase):
@@ -269,6 +288,26 @@ class CliRuntimeTests(unittest.TestCase):
             )
             lockfile = load_lockfile(root / "bnpm.lock")
             self.assertEqual(lockfile.plugins[0].name, "local")
+
+    def test_setup_installs_binaryninja_plugin_bundle(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            plugin_dir = root / "plugins"
+
+            code = main(["setup", "--plugin-dir", str(plugin_dir)])
+
+            target = plugin_dir / "bnpm"
+            self.assertEqual(code, 0)
+            self.assertTrue(target.joinpath("__init__.py").exists())
+            self.assertFalse(target.joinpath("plugin.json").exists())
+            self.assertFalse(target.joinpath("requirements.txt").exists())
+            self.assertTrue(target.joinpath("bnpm", "runtime.py").exists())
+
+    def test_default_binaryninja_plugin_dir_uses_override(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp).resolve()
+            with patch.dict(os.environ, {"BNPM_BINARYNINJA_PLUGIN_DIR": str(root)}):
+                self.assertEqual(default_binaryninja_plugin_dir(), root)
 
     def test_add_path_locks_resolved_dependencies(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -1020,10 +1059,7 @@ local = { path = "../plugin" }
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             plugin_root = root / "bnpm"
-            plugin_root.mkdir()
-            shutil.copy2(Path("binaryninja") / "__init__.py", plugin_root / "__init__.py")
-            shutil.copy2(Path("binaryninja") / "plugin.json", plugin_root / "plugin.json")
-            shutil.copytree(Path("src") / "bnpm", plugin_root / "bnpm")
+            build_bundle(plugin_root)
 
             binaryninja = types.ModuleType("binaryninja")
             binaryninja.PluginCommand = type(
