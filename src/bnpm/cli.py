@@ -16,6 +16,7 @@ from .source import SourceSpec, parse_plugin
 from .status import load_manifest_plugins, lock_mismatches
 from .store import default_home, default_manifest_path, plugin_dir_from_lock
 from .sync import resolve_manifest_path_spec, sync
+from .verify import verify_plugins
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -42,6 +43,7 @@ def main(argv: list[str] | None = None) -> int:
     update_parser.add_argument("names", nargs="*")
 
     subparsers.add_parser("sync")
+    subparsers.add_parser("verify")
     subparsers.add_parser("list")
     setup_parser = subparsers.add_parser("setup")
     setup_parser.add_argument("--plugin-dir", default=None)
@@ -70,6 +72,8 @@ def main(argv: list[str] | None = None) -> int:
             return _update(args.names, manifest_path, lock_path, home)
         if args.command == "sync":
             return _sync(manifest_path, lock_path, home)
+        if args.command == "verify":
+            return _verify(lock_path, home)
         if args.command == "list":
             return _list(lock_path)
         if args.command == "setup":
@@ -180,6 +184,18 @@ def _list(lock_path: Path) -> int:
     for plugin in sorted(lockfile.plugins, key=lambda item: item.name):
         print(f"{plugin.name}\t{plugin.version or 'local'}\t{plugin.commit or plugin.source}")
     return 0
+
+
+def _verify(lock_path: Path, home: Path) -> int:
+    results = verify_plugins(lock_path=lock_path, home=home)
+    failed = False
+    for result in results:
+        if result.ok:
+            print(f"verified {result.plugin.name} {result.actual}")
+        else:
+            failed = True
+            print(f"bnpm: {result.plugin.name}: {result.message}", file=sys.stderr)
+    return 1 if failed else 0
 
 
 def _setup(plugin_dir: Path | None) -> int:

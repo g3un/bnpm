@@ -7,6 +7,7 @@ from pathlib import Path
 
 from .errors import FetchError
 from .hash import tree_sha256
+from .installed import write_installed_plugin
 from .lockfile import LockedPlugin
 from .plugin_types import legacy_python, pyproject
 from .source import SourceSpec
@@ -45,21 +46,25 @@ def _install_git_spec(spec: SourceSpec, home: Path, progress=None) -> LockedPlug
         _checkout(spec, checkout)
         commit = _capture(["git", "rev-parse", "HEAD"], cwd=checkout)
         target = install_dir(home, spec, commit)
+        staged = target.parent / f".{target.name}.{commit}.tmp"
 
-        if target.exists():
-            shutil.rmtree(target)
+        if staged.exists():
+            shutil.rmtree(staged)
         target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copytree(checkout, target, ignore=shutil.ignore_patterns(".git"))
+        shutil.copytree(checkout, staged, ignore=shutil.ignore_patterns(".git"))
 
-    checksum = tree_sha256(target)
-    return LockedPlugin(
-        name=spec.name,
-        source=spec.git,
-        version=spec.version,
-        commit=commit,
-        checksum=checksum,
-        requirements=_read_requirements(target, progress=progress),
-    )
+        checksum = tree_sha256(staged)
+        locked = LockedPlugin(
+            name=spec.name,
+            source=spec.git,
+            version=spec.version,
+            commit=commit,
+            checksum=checksum,
+            requirements=_read_requirements(staged, progress=progress),
+        )
+        write_installed_plugin(staged, locked)
+        _replace_tree(staged, target)
+        return locked
 
 
 def _checkout(spec: SourceSpec, checkout: Path) -> None:
@@ -84,6 +89,24 @@ def _capture(args: list[str], cwd: Path) -> str:
         message = result.stderr.strip() or result.stdout.strip() or "unknown git error"
         raise FetchError(message)
     return result.stdout.strip()
+
+
+def _replace_tree(staged: Path, target: Path) -> None:
+    backup = target.parent / f".{target.name}.previous.tmp"
+    if backup.exists():
+        shutil.rmtree(backup)
+    try:
+        if target.exists():
+            target.rename(backup)
+        staged.rename(target)
+    except Exception:
+        if staged.exists():
+            shutil.rmtree(staged)
+        if not target.exists() and backup.exists():
+            backup.rename(target)
+        raise
+    if backup.exists():
+        shutil.rmtree(backup)
 
 
 def _read_requirements(plugin_path: Path, progress=None) -> list[str]:

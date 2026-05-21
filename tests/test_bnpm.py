@@ -13,6 +13,9 @@ from unittest.mock import Mock, patch
 
 from bnpm.installer import install_plugin_files
 from bnpm.cli import main
+from bnpm.installed import read_installed_plugin, write_installed_plugin
+from bnpm.fetch import install
+from bnpm.hash import tree_sha256
 from bnpm.lockfile import LockedPackage, LockedPlugin, load_lockfile, write_lockfile
 from bnpm.manifest import load_manifest
 from bnpm.packages import _install_requirements, _python_executable
@@ -622,7 +625,7 @@ local = {{ path = "{str(plugin).replace(chr(92), chr(92) * 2)}" }}
             self.assertEqual(locked.version, "branch:main")
             self.assertEqual(
                 plugin_dir(root / "home", "devtools", "abc123"),
-                (root / "home" / "devtools" / "abc123").resolve(),
+                (root / "home" / "devtools").resolve(),
             )
 
     def test_add_local_path_rejects_ref_options(self):
@@ -976,6 +979,173 @@ tool_bnpm = { path = "plugin" }
 
             self.assertFalse(marker.exists())
 
+    def test_git_plugin_loads_when_install_metadata_matches_lock(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            home = root / "home"
+            plugin = plugin_dir(home, "good", "abc123")
+            plugin.mkdir(parents=True)
+            marker = root / "loaded.txt"
+            plugin.joinpath("__init__.py").write_text(
+                f"from pathlib import Path\nPath({str(marker)!r}).write_text('ok', encoding='utf-8')\n",
+                encoding="utf-8",
+            )
+            locked = LockedPlugin(
+                name="good",
+                source="https://github.com/user/plugin.git",
+                version="HEAD",
+                checksum="sha256:metadata",
+                commit="abc123",
+            )
+            write_installed_plugin(plugin, locked)
+            lock = root / "bnpm.lock"
+            write_lockfile(lock, [locked])
+
+            activate(lock_path=lock, home=home)
+
+            self.assertEqual(marker.read_text(encoding="utf-8"), "ok")
+
+    def test_git_plugin_skips_when_install_metadata_differs_from_lock(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            home = root / "home"
+            plugin = plugin_dir(home, "stale", "abc123")
+            plugin.mkdir(parents=True)
+            marker = root / "loaded.txt"
+            plugin.joinpath("__init__.py").write_text(
+                f"from pathlib import Path\nPath({str(marker)!r}).write_text('stale', encoding='utf-8')\n",
+                encoding="utf-8",
+            )
+            installed = LockedPlugin(
+                name="stale",
+                source="https://github.com/user/plugin.git",
+                version="HEAD",
+                checksum="sha256:old",
+                commit="abc123",
+            )
+            locked = LockedPlugin(
+                name="stale",
+                source="https://github.com/user/plugin.git",
+                version="HEAD",
+                checksum="sha256:new",
+                commit="abc123",
+            )
+            write_installed_plugin(plugin, installed)
+            lock = root / "bnpm.lock"
+            write_lockfile(lock, [locked])
+
+            activate(lock_path=lock, home=home)
+
+            self.assertFalse(marker.exists())
+
+    def test_git_plugin_loads_tampered_install_when_metadata_matches_lock(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            home = root / "home"
+            plugin = plugin_dir(home, "tampered", "abc123")
+            plugin.mkdir(parents=True)
+            marker = root / "loaded.txt"
+            init_path = plugin / "__init__.py"
+            init_path.write_text(
+                f"from pathlib import Path\nPath({str(marker)!r}).write_text('ok', encoding='utf-8')\n",
+                encoding="utf-8",
+            )
+            locked = LockedPlugin(
+                name="tampered",
+                source="https://github.com/user/plugin.git",
+                version="HEAD",
+                checksum=tree_sha256(plugin),
+                commit="abc123",
+            )
+            write_installed_plugin(plugin, locked)
+            init_path.write_text(
+                f"from pathlib import Path\nPath({str(marker)!r}).write_text('bad', encoding='utf-8')\n",
+                encoding="utf-8",
+            )
+            lock = root / "bnpm.lock"
+            write_lockfile(lock, [locked])
+
+            activate(lock_path=lock, home=home)
+
+            self.assertEqual(marker.read_text(encoding="utf-8"), "bad")
+
+    def test_verify_detects_tampered_git_plugin(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            home = root / "home"
+            plugin = plugin_dir(home, "tampered", "abc123")
+            plugin.mkdir(parents=True)
+            init_path = plugin / "__init__.py"
+            init_path.write_text("VALUE = 1\n", encoding="utf-8")
+            locked = LockedPlugin(
+                name="tampered",
+                source="https://github.com/user/plugin.git",
+                version="HEAD",
+                checksum=tree_sha256(plugin),
+                commit="abc123",
+            )
+            write_installed_plugin(plugin, locked)
+            init_path.write_text("VALUE = 2\n", encoding="utf-8")
+            lock = root / "bnpm.lock"
+            write_lockfile(lock, [locked])
+
+            stderr = io.StringIO()
+            with contextlib.redirect_stderr(stderr):
+                code = main(["--manifest-path", str(root / "bnpm.toml"), "--home", str(home), "verify"])
+
+            self.assertEqual(code, 1)
+            self.assertIn("tampered: checksum mismatch", stderr.getvalue())
+
+    def test_verify_accepts_installed_metadata_file(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            home = root / "home"
+            plugin = plugin_dir(home, "stable", "abc123")
+            plugin.mkdir(parents=True)
+            plugin.joinpath("__init__.py").write_text("VALUE = 1\n", encoding="utf-8")
+            locked = LockedPlugin(
+                name="stable",
+                source="https://github.com/user/plugin.git",
+                version="HEAD",
+                checksum=tree_sha256(plugin),
+                commit="abc123",
+            )
+            write_installed_plugin(plugin, locked)
+            lock = root / "bnpm.lock"
+            write_lockfile(lock, [locked])
+
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                code = main(["--manifest-path", str(root / "bnpm.toml"), "--home", str(home), "verify"])
+
+            self.assertEqual(code, 0)
+            self.assertIn("verified stable", stdout.getvalue())
+
+    def test_verify_reports_missing_plugin_path(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            home = root / "home"
+            lock = root / "bnpm.lock"
+            write_lockfile(
+                lock,
+                [
+                    LockedPlugin(
+                        name="missing",
+                        source="https://github.com/user/plugin.git",
+                        version="HEAD",
+                        checksum="sha256:missing",
+                        commit="abc123",
+                    )
+                ],
+            )
+
+            stderr = io.StringIO()
+            with contextlib.redirect_stderr(stderr):
+                code = main(["--manifest-path", str(root / "bnpm.toml"), "--home", str(home), "verify"])
+
+            self.assertEqual(code, 1)
+            self.assertIn("missing: missing plugin path", stderr.getvalue())
+
     def test_path_plugin_checksum_mismatch_warns_and_loads(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -1045,8 +1215,7 @@ tool_bnpm = { path = "plugin" }
         with tempfile.TemporaryDirectory() as temp:
             path = plugin_dir(Path(temp), "registered-name", "abc123")
 
-        self.assertEqual(path.name, "abc123")
-        self.assertEqual(path.parent.name, "registered-name")
+        self.assertEqual(path.name, "registered-name")
 
     def test_plugin_dir_encodes_colons(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -1068,6 +1237,78 @@ tool_bnpm = { path = "plugin" }
         )
 
         self.assertEqual(path, Path.home().resolve())
+
+    def test_installed_metadata_round_trip(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            locked = LockedPlugin(
+                name="hexpatch",
+                source="https://github.com/user/hexpatch.git",
+                version="tag:v1.2.3",
+                checksum="sha256:deadbeef",
+                commit="abc123",
+            )
+
+            write_installed_plugin(root, locked)
+            installed = read_installed_plugin(root)
+
+        self.assertIsNotNone(installed)
+        assert installed is not None
+        self.assertEqual(installed.name, "hexpatch")
+        self.assertEqual(installed.version, "tag:v1.2.3")
+        self.assertEqual(installed.commit, "abc123")
+        self.assertEqual(installed.checksum, "sha256:deadbeef")
+
+    def test_tree_sha256_ignores_installed_metadata(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            root.joinpath("__init__.py").write_text("VALUE = 1\n", encoding="utf-8")
+            before = tree_sha256(root)
+
+            write_installed_plugin(
+                root,
+                LockedPlugin(
+                    name="hexpatch",
+                    source="https://github.com/user/hexpatch.git",
+                    version="HEAD",
+                    checksum="sha256:metadata",
+                    commit="abc123",
+                ),
+            )
+
+            self.assertEqual(tree_sha256(root), before)
+
+    def test_git_install_writes_metadata_at_stable_plugin_path(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            home = root / "home"
+
+            def fake_run(args, cwd):
+                if args[:3] == ["git", "clone", "--quiet"]:
+                    checkout = Path(args[-1])
+                    checkout.mkdir()
+                    checkout.joinpath("__init__.py").write_text("VALUE = 1\n", encoding="utf-8")
+
+            with patch("bnpm.fetch._run", side_effect=fake_run), patch(
+                "bnpm.fetch._capture", return_value="abc123"
+            ):
+                locked = install(
+                    SourceSpec(name="stable", kind="git", git="https://github.com/user/stable.git"),
+                    home,
+                )
+
+            target = home / "stable"
+            installed = read_installed_plugin(target)
+            self.assertEqual(locked.commit, "abc123")
+            self.assertTrue(target.joinpath("__init__.py").exists())
+            self.assertFalse((target / "abc123").exists())
+            self.assertIsNotNone(installed)
+            assert installed is not None
+            self.assertEqual(installed.name, locked.name)
+            self.assertEqual(installed.source, locked.source)
+            self.assertEqual(installed.commit, locked.commit)
+            self.assertEqual(installed.checksum, locked.checksum)
+            self.assertEqual(list(home.glob(".*.tmp")), [])
 
     def test_sync_resolves_relative_path_from_manifest_directory(self):
         with tempfile.TemporaryDirectory() as temp:

@@ -5,8 +5,8 @@ import os
 from pathlib import Path
 import sys
 
-from .hash import tree_sha256
-from .lockfile import load_lockfile
+from .installed import InstalledPlugin, installed_matches_lock, read_installed_plugin
+from .lockfile import LockedPlugin, load_lockfile
 from .plugin_types import legacy_python, pyproject
 from .status import load_manifest_plugins, lock_mismatches
 from .store import default_home, default_lock_path, package_dir, plugin_dir_from_lock
@@ -27,10 +27,10 @@ def activate(lock_path: Path | None = None, home: Path | None = None) -> None:
 
     for plugin in lockfile.plugins:
         _log_info(f"resolving {plugin.name} from {plugin.source}")
-        plugin_path = _resolve_plugin_path(home, plugin.name, plugin.source, plugin.commit)
+        plugin_path = _resolve_plugin_path(home, plugin)
         if plugin_path is None:
             continue
-        if not _verify_checksum(plugin.name, plugin_path, plugin.commit is None, plugin.checksum):
+        if not _verify_install(plugin, plugin_path):
             continue
         _load_plugin(plugin.name, plugin_path)
 
@@ -111,9 +111,9 @@ def _is_positive_message_box_result(result, result_type=None) -> bool:
     return name in {"YesButton", "OKButton"}
 
 
-def _resolve_plugin_path(home: Path, name: str, source: str, commit: str | None) -> Path | None:
+def _resolve_plugin_path(home: Path, plugin: LockedPlugin) -> Path | None:
     try:
-        return plugin_dir_from_lock(home, name, source, commit)
+        return plugin_dir_from_lock(home, plugin.name, plugin.source, plugin.commit)
     except ValueError as exc:
         _log_warning(f"skipped plugin: {exc}")
         return None
@@ -128,22 +128,28 @@ def _add_package_dir(home: Path) -> None:
         sys.path.insert(0, package_path)
 
 
-def _verify_checksum(name: str, plugin_path: Path, is_path_plugin: bool, expected: str) -> bool:
+def _verify_install(plugin: LockedPlugin, plugin_path: Path) -> bool:
     if not plugin_path.exists():
-        _log_warning(f"skipped {name}: missing plugin path {plugin_path}")
+        _log_warning(f"skipped {plugin.name}: missing plugin path {plugin_path}")
         return False
 
-    actual = tree_sha256(plugin_path)
-    if actual == expected:
+    if plugin.commit is None:
         return True
 
-    message = f"checksum mismatch for {name}: expected {expected}, got {actual}"
-    if is_path_plugin:
-        _log_warning(message)
+    installed = _read_install_metadata(plugin.name, plugin_path)
+    if installed is not None and installed_matches_lock(installed, plugin):
         return True
 
-    _log_warning(f"{message}; skipping plugin")
+    _log_warning(f"skipped {plugin.name}: install metadata does not match bnpm.lock")
     return False
+
+
+def _read_install_metadata(name: str, plugin_path: Path) -> InstalledPlugin | None:
+    try:
+        return read_installed_plugin(plugin_path)
+    except Exception as exc:
+        _log_warning(f"{name}: invalid install metadata: {exc}")
+        return None
 
 
 def _load_plugin(name: str, plugin_path: Path) -> None:

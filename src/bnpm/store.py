@@ -66,7 +66,7 @@ def install_dir(home: Path, spec: SourceSpec, commit: str) -> Path:
     if spec.kind == "path":
         return Path(spec.path or "").expanduser().resolve()
 
-    return plugin_dir(home, spec.name, commit)
+    return plugin_dir(home, spec.name)
 
 
 def plugin_dir_from_lock(home: Path, name: str, source: str, commit: str | None) -> Path:
@@ -74,11 +74,11 @@ def plugin_dir_from_lock(home: Path, name: str, source: str, commit: str | None)
         if source.startswith("file://"):
             return file_uri_to_path(source)
         return Path(source).expanduser().resolve()
-    return plugin_dir(home, name, commit)
+    return plugin_dir(home, name)
 
 
-def plugin_dir(home: Path, name: str, commit: str) -> Path:
-    target = home.joinpath(_encode_path_segment(name), commit).resolve()
+def plugin_dir(home: Path, name: str, commit: str | None = None) -> Path:
+    target = home.joinpath(_encode_path_segment(name)).resolve()
     home = home.resolve()
     if not target.is_relative_to(home):
         raise ValueError(f"plugin path escapes BNPM home: {name}")

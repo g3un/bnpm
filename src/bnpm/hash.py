@@ -5,6 +5,7 @@ from pathlib import Path
 
 
 IGNORED_DIRS = {".git", "__pycache__", ".venv", "venv"}
+IGNORED_FILES = {".bnpm-installed.toml"}
 
 
 def tree_sha256(path: Path) -> str:
@@ -12,6 +13,8 @@ def tree_sha256(path: Path) -> str:
     for item in sorted(path.rglob("*")):
         rel = item.relative_to(path)
         if any(part in IGNORED_DIRS for part in rel.parts):
+            continue
+        if item.name in IGNORED_FILES:
             continue
         if item.is_dir():
             continue
