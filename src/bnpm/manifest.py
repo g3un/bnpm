@@ -1,19 +1,12 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from pathlib import Path
 
-from .atomic import atomic_write_text
 from .errors import ManifestError
-from .source import SourceSpec, parse_plugin
-from .toml_compat import load_toml
-
-
-@dataclass(frozen=True)
-class Manifest:
-    path: Path
-    version: int
-    plugins: dict[str, SourceSpec]
+from .models import Manifest, SourceSpec
+from .source import parse_plugin
+from .utils.atomic import write_text_atomically
+from .utils.toml import load_toml
 
 
 def load_manifest(path: Path) -> Manifest:
@@ -43,7 +36,7 @@ def load_manifest(path: Path) -> Manifest:
 
 
 def write_manifest(path: Path, plugins: dict[str, SourceSpec]) -> None:
-    atomic_write_text(path, _format_manifest(plugins), allow_direct_fallback=True)
+    write_text_atomically(path, _format_manifest(plugins), allow_direct_fallback=True)
 
 
 def _format_manifest(plugins: dict[str, SourceSpec]) -> str:
@@ -72,3 +65,4 @@ def _format_plugin(spec: SourceSpec) -> str:
 
 def _escape(value: str) -> str:
     return value.replace("\\", "\\\\").replace('"', '\\"')
+

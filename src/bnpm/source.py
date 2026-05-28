@@ -1,32 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from urllib.parse import ParseResult, urlparse
 
 from .errors import SourceError
-
-
-@dataclass(frozen=True)
-class SourceSpec:
-    name: str
-    kind: str
-    git: str | None = None
-    path: str | None = None
-    tag: str | None = None
-    branch: str | None = None
-    rev: str | None = None
-
-    @property
-    def version(self) -> str | None:
-        if self.kind == "path":
-            return None
-        if self.tag:
-            return f"tag:{self.tag}"
-        if self.rev:
-            return f"rev:{self.rev}"
-        if self.branch:
-            return f"branch:{self.branch}"
-        return "HEAD"
+from .models import SourceSpec
 
 
 def parse_plugin(name: str, value: object) -> SourceSpec:
@@ -42,19 +19,19 @@ def _parse_table(name: str, value: dict[str, object]) -> SourceSpec:
     if len(keys) > 1:
         raise SourceError(f"plugin {name!r} can only set one of tag, branch, rev")
 
-    tag = _optional_str(name, value, "tag")
-    branch = _optional_str(name, value, "branch")
-    rev = _optional_str(name, value, "rev")
+    tag = _read_optional_str(name, value, "tag")
+    branch = _read_optional_str(name, value, "branch")
+    rev = _read_optional_str(name, value, "rev")
 
     if "path" in value:
-        path = _required_str(name, value, "path")
+        path = _read_required_str(name, value, "path")
         if "git" in value:
             raise SourceError(f"plugin {name!r} cannot set both git and path")
         if keys:
             raise SourceError(f"path plugin {name!r} cannot set tag, branch, or rev")
         return SourceSpec(name=name, kind="path", path=path)
 
-    git = _required_str(name, value, "git")
+    git = _read_required_str(name, value, "git")
     return SourceSpec(name=name, kind="git", git=_normalize_git_url(git), tag=tag, branch=branch, rev=rev)
 
 
@@ -98,14 +75,15 @@ def _reject_inline_ref(source: str, parsed: ParseResult) -> None:
         raise SourceError(f"inline refs are not supported in plugin source {source!r}")
 
 
-def _required_str(name: str, table: dict[str, object], key: str) -> str:
+def _read_required_str(name: str, table: dict[str, object], key: str) -> str:
     value = table.get(key)
     if not isinstance(value, str) or not value:
         raise SourceError(f"plugin {name!r} requires string field {key!r}")
     return value
 
 
-def _optional_str(name: str, table: dict[str, object], key: str) -> str | None:
+def _read_optional_str(name: str, table: dict[str, object], key: str) -> str | None:
     if key not in table:
         return None
-    return _required_str(name, table, key)
+    return _read_required_str(name, table, key)
+

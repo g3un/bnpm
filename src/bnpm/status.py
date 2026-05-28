@@ -1,38 +1,29 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from pathlib import Path
 
-from .lockfile import Lockfile
-from .manifest import Manifest, load_manifest
-from .source import SourceSpec
-from .store import path_to_file_uri
+from .manifest import load_manifest
+from .models import Lockfile, Manifest, ManifestPlugin, SourceSpec
+from .utils.locations import convert_path_to_file_uri
 from .sync import resolve_manifest_path_spec
-
-
-@dataclass(frozen=True)
-class ManifestPlugin:
-    name: str
-    source: str
-    version: str | None
 
 
 def load_manifest_plugins(path: Path) -> dict[str, ManifestPlugin] | None:
     if not path.exists():
         return None
     manifest = load_manifest(path)
-    return manifest_plugins(manifest)
+    return collect_manifest_plugins(manifest)
 
 
-def manifest_plugins(manifest: Manifest) -> dict[str, ManifestPlugin]:
+def collect_manifest_plugins(manifest: Manifest) -> dict[str, ManifestPlugin]:
     plugins = {}
     for name, spec in manifest.plugins.items():
         resolved = resolve_manifest_path_spec(spec, manifest.path.parent)
-        plugins[name] = _manifest_plugin(name, resolved)
+        plugins[name] = _build_manifest_plugin(name, resolved)
     return plugins
 
 
-def lock_mismatches(
+def collect_lock_mismatches(
     manifest_plugins_by_name: dict[str, ManifestPlugin] | None,
     lockfile: Lockfile,
 ) -> list[str]:
@@ -59,14 +50,17 @@ def lock_mismatches(
     return messages
 
 
-def _manifest_plugin(name: str, spec: SourceSpec) -> ManifestPlugin:
+def _build_manifest_plugin(name: str, spec: SourceSpec) -> ManifestPlugin:
     if spec.kind == "path":
         assert spec.path is not None
         return ManifestPlugin(
             name=name,
-            source=path_to_file_uri(Path(spec.path)),
+            source=convert_path_to_file_uri(Path(spec.path)),
             version=None,
         )
 
     assert spec.git is not None
     return ManifestPlugin(name=name, source=spec.git, version=spec.version)
+
+
+

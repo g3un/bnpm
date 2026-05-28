@@ -34,7 +34,7 @@ def _parse_subset(text: str) -> dict[str, Any]:
             name = line[2:-2].strip()
             if not name:
                 raise ValueError("empty TOML array table name")
-            parent, key_name = _table_parent(data, name)
+            parent, key_name = _resolve_table_parent(data, name)
             array = parent.setdefault(key_name, [])
             if not isinstance(array, list):
                 raise ValueError(f"TOML key {name!r} is not an array")
@@ -48,7 +48,7 @@ def _parse_subset(text: str) -> dict[str, Any]:
             name = line[1:-1].strip()
             if not name:
                 raise ValueError("empty TOML table name")
-            parent, key_name = _table_parent(data, name)
+            parent, key_name = _resolve_table_parent(data, name)
             table = parent.setdefault(key_name, {})
             if not isinstance(table, dict):
                 raise ValueError(f"TOML key {name!r} is not a table")
@@ -138,7 +138,7 @@ def _parse_string(value: str) -> str:
     return "".join(result)
 
 
-def _table_parent(data: dict[str, Any], name: str) -> tuple[dict[str, Any], str]:
+def _resolve_table_parent(data: dict[str, Any], name: str) -> tuple[dict[str, Any], str]:
     parts = [part.strip() for part in name.split(".")]
     if not parts or any(not part for part in parts):
         raise ValueError(f"invalid TOML table name: {name}")
@@ -189,3 +189,4 @@ def _strip_comment(line: str) -> str:
         if char == "#" and not in_string:
             return line[:index]
     return line
+

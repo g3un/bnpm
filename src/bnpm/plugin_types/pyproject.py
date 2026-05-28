@@ -5,7 +5,7 @@ import re
 from typing import Any, Callable
 
 from ..errors import FetchError
-from ..toml_compat import load_toml
+from ..utils.toml import load_toml
 
 
 Warn = Callable[[str], None]
@@ -33,15 +33,15 @@ def resolve_entry(name: str, plugin_path: Path, warn: Warn) -> tuple[Path, Path]
     if pyproject is None:
         return None
 
-    explicit = _tool_bnpm_entry(name, plugin_path, pyproject, warn)
+    explicit = _resolve_tool_bnpm_entry(name, plugin_path, pyproject, warn)
     if explicit is not None:
         return explicit
 
-    project_name = _pyproject_name(pyproject)
+    project_name = _get_pyproject_name(pyproject)
     if not project_name:
         return None
 
-    package_name = _import_package_name(project_name)
+    package_name = _resolve_import_package_name(project_name)
     init_path = plugin_path / "src" / package_name / "__init__.py"
     if init_path.exists():
         return init_path, plugin_path / "src"
@@ -56,7 +56,7 @@ def _load_pyproject(path: Path, warn: Warn) -> dict[str, Any] | None:
         return None
 
 
-def _tool_bnpm_entry(name: str, plugin_path: Path, pyproject: dict[str, Any], warn: Warn) -> tuple[Path, Path] | None:
+def _resolve_tool_bnpm_entry(name: str, plugin_path: Path, pyproject: dict[str, Any], warn: Warn) -> tuple[Path, Path] | None:
     tool = pyproject.get("tool", {})
     if not isinstance(tool, dict):
         return None
@@ -87,7 +87,7 @@ def _tool_bnpm_entry(name: str, plugin_path: Path, pyproject: dict[str, Any], wa
     return init_path, import_base
 
 
-def _pyproject_name(data: dict[str, Any]) -> str | None:
+def _get_pyproject_name(data: dict[str, Any]) -> str | None:
     project = data.get("project", {})
     if not isinstance(project, dict):
         return None
@@ -97,7 +97,7 @@ def _pyproject_name(data: dict[str, Any]) -> str | None:
     return name
 
 
-def _import_package_name(project_name: str) -> str:
+def _resolve_import_package_name(project_name: str) -> str:
     return re.sub(r"[-.]+", "_", project_name)
 
 
@@ -107,3 +107,4 @@ def _is_relative_to(path: Path, parent: Path) -> bool:
         return True
     except ValueError:
         return False
+

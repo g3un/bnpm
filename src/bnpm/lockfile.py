@@ -1,40 +1,13 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from pathlib import Path
 
-from .atomic import atomic_write_text
-from .toml_compat import load_toml
+from .models import LockedPackage, LockedPlugin, Lockfile
+from .utils.atomic import write_text_atomically
+from .utils.toml import load_toml
 
 
 LOCK_VERSION = 1
-
-
-@dataclass(frozen=True)
-class LockedPlugin:
-    name: str
-    source: str
-    checksum: str
-    version: str | None = None
-    commit: str | None = None
-    dependencies: list[str] | None = None
-    requirements: list[str] | None = None
-
-
-@dataclass(frozen=True)
-class LockedPackage:
-    name: str
-    source: str
-    version: str
-    checksum: str | None = None
-    dependencies: list[str] | None = None
-
-
-@dataclass(frozen=True)
-class Lockfile:
-    path: Path
-    plugins: list[LockedPlugin]
-    packages: list[LockedPackage]
 
 
 def load_lockfile(path: Path) -> Lockfile:
@@ -51,7 +24,7 @@ def load_lockfile(path: Path) -> Lockfile:
                 checksum=item["checksum"],
                 version=item.get("version"),
                 commit=item.get("commit"),
-                dependencies=_string_list(item.get("dependencies", []), "plugins.dependencies"),
+                dependencies=_parse_string_list(item.get("dependencies", []), "plugins.dependencies"),
             )
         )
 
@@ -63,7 +36,7 @@ def load_lockfile(path: Path) -> Lockfile:
                 source=item["source"],
                 version=item["version"],
                 checksum=item.get("checksum"),
-                dependencies=_string_list(item.get("dependencies", []), "packages.dependencies"),
+                dependencies=_parse_string_list(item.get("dependencies", []), "packages.dependencies"),
             )
         )
     return Lockfile(path=path, plugins=plugins, packages=packages)
@@ -74,7 +47,7 @@ def write_lockfile(
     plugins: list[LockedPlugin],
     packages: list[LockedPackage] | None = None,
 ) -> None:
-    atomic_write_text(path, _format_lockfile(plugins, packages or []), allow_direct_fallback=True)
+    write_text_atomically(path, _format_lockfile(plugins, packages or []), allow_direct_fallback=True)
 
 
 def _format_lockfile(plugins: list[LockedPlugin], packages: list[LockedPackage]) -> str:
@@ -127,7 +100,7 @@ def _format_string_list(name: str, values: list[str]) -> list[str]:
     return lines
 
 
-def _string_list(value: object, field: str) -> list[str]:
+def _parse_string_list(value: object, field: str) -> list[str]:
     if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
         raise ValueError(f"{field} must be a list of strings")
     return value
@@ -135,3 +108,4 @@ def _string_list(value: object, field: str) -> list[str]:
 
 def _escape(value: str) -> str:
     return value.replace("\\", "\\\\").replace('"', '\\"')
+

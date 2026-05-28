@@ -8,7 +8,7 @@ IGNORED_DIRS = {".git", "__pycache__", ".venv", "venv"}
 IGNORED_FILES = {".bnpm-installed.toml"}
 
 
-def tree_sha256(path: Path) -> str:
+def compute_tree_sha256(path: Path) -> str:
     digest = hashlib.sha256()
     for item in sorted(path.rglob("*")):
         rel = item.relative_to(path)
@@ -23,3 +23,4 @@ def tree_sha256(path: Path) -> str:
         digest.update(item.read_bytes())
         digest.update(b"\0")
     return "sha256:" + digest.hexdigest()
+

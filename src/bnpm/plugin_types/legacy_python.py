@@ -18,3 +18,5 @@ def resolve_entry(plugin_path: Path) -> tuple[Path, Path] | None:
     if init_path.exists():
         return init_path, plugin_path
     return None
+
+

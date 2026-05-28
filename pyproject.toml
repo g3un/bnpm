@@ -14,7 +14,7 @@ authors = [
 ]
 
 [project.scripts]
-bnpm = "bnpm.cli:main"
+bnpm = "bnpm.cli:run_cli"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/bnpm"]

@@ -31,7 +31,7 @@ try:
             return
         try:
             log_info("sync started", logger="BNPM")
-            installed = sync(progress=lambda message: log_info(message, logger="BNPM"))
+            installed = sync(report_progress=lambda message: log_info(message, logger="BNPM"))
             log_info(f"synced {len(installed)} plugin(s)", logger="BNPM")
             activate()
         except Exception as exc:
@@ -47,3 +47,6 @@ except Exception as exc:
         log_error(f"failed to activate: {exc}", logger="BNPM")
     except Exception:
         raise
+
+
+
