@@ -20,31 +20,35 @@ class RemoveCommand(Command):
 
     @classmethod
     def configure_parser(cls, parser: ArgumentParser) -> None:
-        parser.add_argument("name")
+        parser.add_argument("names", nargs="+")
 
     @classmethod
     def run(cls, args: Namespace) -> int:
         config = get_config()
-        name = args.name
+        names = list(dict.fromkeys(args.names))
         manifest_path = config.bnpm_manifest_path
         lock_path = config.bnpm_lock_path
         home = config.bnpm_plugin_dir
 
         ensure_clean_manifest_lock(manifest_path, lock_path)
         manifest = load_manifest(manifest_path)
-        if name not in manifest.plugins:
-            print(f"bnpm: plugin {name!r} is not in bnpm.toml", file=sys.stderr)
+        missing = sorted(set(names) - set(manifest.plugins))
+        if missing:
+            quoted = ", ".join(repr(name) for name in missing)
+            print(f"bnpm: plugin(s) {quoted} are not in bnpm.toml", file=sys.stderr)
             return 1
 
         lockfile = load_lockfile(lock_path)
-        locked_plugin = next((plugin for plugin in lockfile.plugins if plugin.name == name), None)
+        locked_plugins = [plugin for plugin in lockfile.plugins if plugin.name in names]
 
         plugins = dict(manifest.plugins)
-        del plugins[name]
+        for name in names:
+            del plugins[name]
         write_manifest(manifest_path, plugins)
         code = sync_plugins(manifest_path, lock_path, home)
-        if code == 0 and locked_plugin is not None:
-            _remove_plugin(locked_plugin, home)
+        if code == 0:
+            for plugin in locked_plugins:
+                _remove_plugin(plugin, home)
         return code
 
 

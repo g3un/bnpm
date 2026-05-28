@@ -3,12 +3,15 @@ from __future__ import annotations
 import contextlib
 import importlib
 import io
+import tempfile
 import types
 import unittest
 from pathlib import Path
 from unittest.mock import ANY, patch
 
 from bnpm.errors import BnpmError
+from bnpm.lockfile import LockedPlugin, write_lockfile
+from bnpm.manifest import load_manifest
 
 
 cli_main = importlib.import_module("bnpm.cli.main")
@@ -68,6 +71,47 @@ class CliTests(unittest.TestCase):
 
         self.assertEqual(code, 0)
         verify.assert_called_once_with(lock_path=config.bnpm_lock_path, home=config.bnpm_plugin_dir)
+
+    def test_remove_accepts_multiple_plugins(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            manifest = root / "bnpm.toml"
+            lock = root / "bnpm.lock"
+            home = root / "home"
+            manifest.write_text(
+                """
+version = 1
+
+[plugins]
+alpha = { git = "https://github.com/user/alpha.git" }
+beta = { git = "https://github.com/user/beta.git" }
+gamma = { git = "https://github.com/user/gamma.git" }
+""".strip(),
+                encoding="utf-8",
+            )
+            write_lockfile(
+                lock,
+                [
+                    LockedPlugin("alpha", "https://github.com/user/alpha.git", "sha256:alpha", version="HEAD"),
+                    LockedPlugin("beta", "https://github.com/user/beta.git", "sha256:beta", version="HEAD"),
+                    LockedPlugin("gamma", "https://github.com/user/gamma.git", "sha256:gamma", version="HEAD"),
+                ],
+            )
+            config = types.SimpleNamespace(
+                bnpm_manifest_path=manifest,
+                bnpm_lock_path=lock,
+                bnpm_plugin_dir=home,
+            )
+
+            with patch("bnpm.cli.remove.get_config", return_value=config), patch(
+                "bnpm.cli.remove.sync_plugins",
+                return_value=0,
+            ) as sync:
+                code = cli_main.run_cli(["remove", "alpha", "beta"])
+
+            self.assertEqual(code, 0)
+            self.assertEqual(set(load_manifest(manifest).plugins), {"gamma"})
+            sync.assert_called_once_with(manifest, lock, home)
 
     def test_bnpm_error_returns_one(self):
         with patch(
