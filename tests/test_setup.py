@@ -4,11 +4,12 @@ import os
 import tempfile
 from pathlib import Path
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, call, patch
 
 from bnpm.helpers import find_bn_install_path, get_bn_python_version
-from bnpm.setup import setup_bn, setup_bnpm_venv
+from bnpm.setup import resolve_bn_install_api, setup_bn, setup_bnpm_venv
 from tests.helpers import clear_bnpm_caches
+
 
 class SetupTests(unittest.TestCase):
     def setUp(self):
@@ -67,23 +68,21 @@ site_packages.joinpath("binaryninja.py").write_text("API_VERSION = 'test'\\n", e
             )
             venv_path = root / "venv"
 
-            created_versions = []
-
-            def create_venv(path, python_version):
-                import venv
-
-                created_versions.append(python_version)
-                venv.EnvBuilder(with_pip=True).create(path)
-
             with patch("bnpm.setup.resolve_bn_install_api", return_value=install_api), patch(
                 "bnpm.setup.resolve_bn_python_major_minor",
                 return_value="3.10",
-            ), patch("bnpm.setup._create_venv", side_effect=create_venv):
+            ), patch("bnpm.setup._create_venv") as create_venv, patch("bnpm.setup._run_venv_python") as run_python:
                 result = setup_bnpm_venv(venv_path)
 
             self.assertEqual(result, venv_path.resolve())
-            self.assertTrue(venv_path.joinpath("pyvenv.cfg").exists())
-            self.assertEqual(created_versions, ["3.10"])
+            create_venv.assert_called_once_with(venv_path.resolve(), "3.10")
+            self.assertEqual(
+                run_python.call_args_list,
+                [
+                    call(venv_path.resolve(), [str(install_api)]),
+                    call(venv_path.resolve(), ["-c", "import binaryninja"]),
+                ],
+            )
 
     def test_setup_bnpm_venv_reports_missing_install_api(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -135,7 +134,24 @@ site_packages.joinpath("binaryninja.py").write_text("API_VERSION = 'test'\\n", e
             ):
                 self.assertEqual(find_bn_install_path(), install_root)
 
-    def test_helper_finds_bn_install_path_from_lastrun_executable(self):
+    def test_helper_finds_bn_install_path_from_lastrun_linux_executable(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp).resolve()
+            user_dir = root / "user"
+            install_root = root / "binaryninja"
+            binary = install_root / "binaryninja"
+            user_dir.mkdir()
+            install_root.mkdir()
+            binary.write_text("", encoding="utf-8")
+            user_dir.joinpath("lastrun").write_text(str(binary), encoding="utf-8")
+
+            with patch("bnpm.helpers.bn.platform.system", return_value="Linux"), patch.dict(
+                os.environ,
+                {"BN_USER_DIRECTORY": str(user_dir)},
+            ):
+                self.assertEqual(find_bn_install_path(), install_root)
+
+    def test_helper_finds_bn_install_path_from_lastrun_windows_executable(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp).resolve()
             user_dir = root / "user"
@@ -152,21 +168,81 @@ site_packages.joinpath("binaryninja.py").write_text("API_VERSION = 'test'\\n", e
             ):
                 self.assertEqual(find_bn_install_path(), install_root)
 
+    def test_helper_returns_none_without_lastrun(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp).resolve()
+            user_dir = root / "user"
+            user_dir.mkdir()
+
+            with patch("bnpm.helpers.bn.platform.system", return_value="Linux"), patch.dict(
+                os.environ,
+                {"BN_USER_DIRECTORY": str(user_dir)},
+            ):
+                self.assertIsNone(find_bn_install_path())
+
+    def test_helper_finds_macos_app_root_from_lastrun_macos_dir(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp).resolve()
+            user_dir = root / "user"
+            install_root = root / "Binary Ninja.app"
+            macos_dir = install_root / "Contents" / "MacOS"
+            user_dir.mkdir()
+            macos_dir.mkdir(parents=True)
+            user_dir.joinpath("lastrun").write_text(str(macos_dir), encoding="utf-8")
+
+            with patch("bnpm.helpers.bn.platform.system", return_value="Darwin"), patch.dict(
+                os.environ,
+                {"BN_USER_DIRECTORY": str(user_dir)},
+            ):
+                self.assertEqual(find_bn_install_path(), install_root)
+
     def test_helper_reads_bn_bundled_python_version(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp).resolve()
             python = root / "plugins" / "python" / "python.exe"
             python.parent.mkdir(parents=True)
             python.write_text("", encoding="utf-8")
-            result = Mock(returncode=0, stdout="3.10.10\n", stderr="")
+            result = Mock(returncode=0, stdout='Python version: "3.10"\n', stderr="")
 
             with patch("bnpm.helpers.bn.platform.system", return_value="Windows"), patch(
                 "bnpm.helpers.bn.subprocess.run",
                 return_value=result,
             ) as run:
-                self.assertEqual(get_bn_python_version(root), "3.10.10")
+                self.assertEqual(get_bn_python_version(root), "3.10")
 
-            self.assertEqual(run.call_args.args[0][0], str(python.resolve()))
+            self.assertEqual(run.call_args.args[0], [str(python.resolve()), "-m", "sysconfig"])
+
+    def test_helper_reads_macos_bnpython_version_from_sysconfig(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp).resolve()
+            python = root / "Binary Ninja.app" / "Contents" / "MacOS" / "bnpython3"
+            python.parent.mkdir(parents=True)
+            python.write_text("", encoding="utf-8")
+            sysconfig = Mock(returncode=0, stdout='Python version: "3.10"\n', stderr="")
+
+            with patch("bnpm.helpers.bn.platform.system", return_value="Darwin"), patch(
+                "bnpm.helpers.bn.subprocess.run",
+                return_value=sysconfig,
+            ) as run:
+                self.assertEqual(get_bn_python_version(root / "Binary Ninja.app"), "3.10")
+
+            self.assertEqual(run.call_args.args[0], [str(python.resolve()), "-m", "sysconfig"])
+
+    def test_helper_reads_linux_bnpython_version_from_sysconfig(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp).resolve()
+            python = root / "binaryninja" / "bnpython3"
+            python.parent.mkdir(parents=True)
+            python.write_text("", encoding="utf-8")
+            sysconfig = Mock(returncode=0, stdout='Python version: "3.10"\n', stderr="")
+
+            with patch("bnpm.helpers.bn.platform.system", return_value="Linux"), patch(
+                "bnpm.helpers.bn.subprocess.run",
+                return_value=sysconfig,
+            ) as run:
+                self.assertEqual(get_bn_python_version(root / "binaryninja"), "3.10")
+
+            self.assertEqual(run.call_args.args[0], [str(python.resolve()), "-m", "sysconfig"])
 
     def test_helper_returns_none_when_bn_python_is_missing(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -175,7 +251,13 @@ site_packages.joinpath("binaryninja.py").write_text("API_VERSION = 'test'\\n", e
             with patch("bnpm.helpers.bn.platform.system", return_value="Windows"):
                 self.assertIsNone(get_bn_python_version(root))
 
+    def test_resolve_bn_install_api_finds_macos_bundle_script(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp).resolve()
+            install_root = root / "Binary Ninja.app"
+            install_api = install_root / "Contents" / "Resources" / "scripts" / "install_api.py"
+            install_api.parent.mkdir(parents=True)
+            install_api.write_text("", encoding="utf-8")
 
-
-
-
+            with patch("bnpm.setup.find_bn_install_path", return_value=install_root):
+                self.assertEqual(resolve_bn_install_api(), install_api)

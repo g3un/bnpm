@@ -49,9 +49,14 @@ def setup_bnpm_venv(venv_path: Path | None = None) -> Path:
 def resolve_bn_install_api() -> Path | None:
     root = find_bn_install_path()
     if root is not None:
-        path = root / "scripts" / "install_api.py"
-        if path.exists():
-            return path.resolve()
+        candidates = [
+            root / "scripts" / "install_api.py",
+            root / "Contents" / "Resources" / "scripts" / "install_api.py",
+            root.parent / "Resources" / "scripts" / "install_api.py",
+        ]
+        for path in candidates:
+            if path.exists():
+                return path.resolve()
     return None
 
 
@@ -114,5 +119,4 @@ def _ignore_generated(directory: str, names: list[str]) -> set[str]:
     ignored.update(name for name in names if name.endswith((".pyc", ".pyo")))
     ignored.update(name for name in names if name.endswith((".dist-info", ".egg-info")))
     return ignored
-
 
