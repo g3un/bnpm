@@ -17,7 +17,8 @@ bnpm setup
 Upgrade BNPM later:
 
 ```bash
-uv tool upgrade bnpm --reinstall
+uv tool upgrade bnpm
+# Reinstall BNPM into Binary Ninja after upgrading the CLI.
 bnpm setup
 ```
 
@@ -25,7 +26,7 @@ bnpm setup
 bnpm add plugin --git github.com/owner/plugin --tag v1.2.3
 bnpm add devtools --git github.com/owner/devtools --branch main
 bnpm add local --path ../local-plugin
-bnpm remove plugin
+bnpm remove plugin [plugin ...]
 bnpm update [plugin]
 bnpm sync
 bnpm list
