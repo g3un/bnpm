@@ -7,7 +7,7 @@ import unittest
 from unittest.mock import Mock, call, patch
 
 from bnpm.helpers import find_bn_install_path, get_bn_python_version
-from bnpm.setup import resolve_bn_install_api, setup_bn, setup_bnpm_venv
+from bnpm.setup import _run_venv_python, resolve_bn_install_api, setup_bn, setup_bnpm_venv
 from tests.helpers import clear_bnpm_caches
 
 
@@ -79,7 +79,7 @@ site_packages.joinpath("binaryninja.py").write_text("API_VERSION = 'test'\\n", e
             self.assertEqual(
                 run_python.call_args_list,
                 [
-                    call(venv_path.resolve(), [str(install_api)]),
+                    call(venv_path.resolve(), [str(install_api), "--force"]),
                     call(venv_path.resolve(), ["-c", "import binaryninja"]),
                 ],
             )
@@ -110,6 +110,19 @@ site_packages.joinpath("binaryninja.py").write_text("API_VERSION = 'test'\\n", e
             ):
                 with self.assertRaisesRegex(Exception, "install failed"):
                     setup_bnpm_venv(venv_path)
+
+    def test_run_venv_python_sets_virtual_env(self):
+        with tempfile.TemporaryDirectory() as temp:
+            venv_path = Path(temp) / "venv"
+            python = venv_path / "bin" / "python"
+            python.parent.mkdir(parents=True)
+            python.write_text("", encoding="utf-8")
+
+            result = Mock(returncode=0, stdout="", stderr="")
+            with patch("bnpm.setup.subprocess.run", return_value=result) as run:
+                _run_venv_python(venv_path, ["script.py"])
+
+            self.assertEqual(run.call_args.kwargs["env"]["VIRTUAL_ENV"], str(venv_path))
 
     def test_setup_bn_uses_bn_user_directory(self):
         with tempfile.TemporaryDirectory() as temp:

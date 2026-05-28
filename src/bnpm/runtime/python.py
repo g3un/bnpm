@@ -1,15 +1,15 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
 import subprocess
+from pathlib import Path
 
 from ..config import get_config
 from ..errors import BnpmError
 from ..lockfile import load_lockfile
 from ..models import Lockfile
 from ..utils.locations import resolve_package_dir
-from .loader import resolve_plugin_path_or_raise, resolve_plugin_entry, verify_install
+from .loader import resolve_plugin_entry, resolve_plugin_path_or_raise, verify_install
 
 
 def resolve_plugin_python_executable() -> Path:
@@ -41,7 +41,10 @@ def build_plugin_python_env(
     _, import_base = entry
 
     result = dict(os.environ if env is None else env)
-    result["PYTHONPATH"] = _join_pythonpath(_collect_plugin_pythonpath_entries(home, import_base), result.get("PYTHONPATH"))
+    result["VIRTUAL_ENV"] = str(config.bnpm_venv_dir)
+    result["PYTHONPATH"] = _join_pythonpath(
+        _collect_plugin_pythonpath_entries(home, import_base), result.get("PYTHONPATH")
+    )
     return result
 
 
@@ -82,6 +85,3 @@ def _join_pythonpath(entries: list[Path], existing: str | None) -> str:
     if existing:
         values.append(existing)
     return os.pathsep.join(values)
-
-
-

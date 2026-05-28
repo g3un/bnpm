@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import platform
 import shutil
 import stat
 import subprocess
@@ -41,29 +42,31 @@ def setup_bnpm_venv(venv_path: Path | None = None) -> Path:
             "could not find Binary Ninja scripts/install_api.py; "
             "start Binary Ninja once and rerun setup"
         )
-    _run_venv_python(venv_path, [str(install_api)])
+    _run_venv_python(venv_path, [str(install_api), "--force"])
     _run_venv_python(venv_path, ["-c", "import binaryninja"])
     return venv_path
 
 
 def resolve_bn_install_api() -> Path | None:
     root = find_bn_install_path()
-    if root is not None:
-        candidates = [
-            root / "scripts" / "install_api.py",
-            root / "Contents" / "Resources" / "scripts" / "install_api.py",
-            root.parent / "Resources" / "scripts" / "install_api.py",
-        ]
-        for path in candidates:
-            if path.exists():
-                return path.resolve()
-    return None
+    if root is None:
+        return None
+    if platform.system() == "Darwin":
+        path = root / "Contents" / "Resources" / "scripts" / "install_api.py"
+    else:
+        path = root / "scripts" / "install_api.py"
+    if not path.exists():
+        return None
+    return path.resolve()
 
 
 def _run_venv_python(venv_path: Path, args: list[str]) -> None:
     python = resolve_venv_python(venv_path)
+    env = os.environ.copy()
+    env["VIRTUAL_ENV"] = str(venv_path)
     result = subprocess.run(
         [str(python), *args],
+        env=env,
         text=True,
         capture_output=True,
         check=False,
@@ -119,4 +122,3 @@ def _ignore_generated(directory: str, names: list[str]) -> set[str]:
     ignored.update(name for name in names if name.endswith((".pyc", ".pyo")))
     ignored.update(name for name in names if name.endswith((".dist-info", ".egg-info")))
     return ignored
-

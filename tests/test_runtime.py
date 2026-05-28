@@ -20,6 +20,7 @@ from bnpm.utils.locations import (
     resolve_plugin_dir,
     convert_path_to_file_uri,
 )
+from bnpm.config import get_config
 from tests.helpers import clear_bnpm_caches
 
 class RuntimeTests(unittest.TestCase):
@@ -177,9 +178,10 @@ dependencies = []
             )
 
             pythonpath = env["PYTHONPATH"].split(os.pathsep)
-            self.assertEqual(pythonpath[0], str(plugin / "src"))
-            self.assertEqual(pythonpath[1], str(resolve_package_dir(home)))
+            self.assertEqual(Path(pythonpath[0]).resolve(), (plugin / "src").resolve())
+            self.assertEqual(Path(pythonpath[1]).resolve(), resolve_package_dir(home).resolve())
             self.assertEqual(pythonpath[-1], "existing")
+            self.assertEqual(env["VIRTUAL_ENV"], str(get_config().bnpm_venv_dir))
 
     def test_plugin_python_env_reports_missing_locked_plugin(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -412,8 +414,6 @@ dependencies = []
 
 if __name__ == "__main__":
     unittest.main()
-
-
 
 
 
