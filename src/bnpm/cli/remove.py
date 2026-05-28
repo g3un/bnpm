@@ -1,34 +1,51 @@
 from __future__ import annotations
 
+from argparse import ArgumentParser, Namespace
 from pathlib import Path
 import shutil
 import sys
 
+from ..config import get_config
 from ..lockfile import load_lockfile
 from ..manifest import load_manifest, write_manifest
 from ..models import LockedPlugin
 from ..utils.locations import resolve_plugin_dir_from_lock
+from .command import Command
 from .common import ensure_clean_manifest_lock
-from .sync import run as sync_run
+from .sync import sync_plugins
 
 
-def run(name: str, manifest_path: Path, lock_path: Path, home: Path) -> int:
-    ensure_clean_manifest_lock(manifest_path, lock_path)
-    manifest = load_manifest(manifest_path)
-    if name not in manifest.plugins:
-        print(f"bnpm: plugin {name!r} is not in bnpm.toml", file=sys.stderr)
-        return 1
+class RemoveCommand(Command):
+    name = "remove"
 
-    lockfile = load_lockfile(lock_path)
-    locked_plugin = next((plugin for plugin in lockfile.plugins if plugin.name == name), None)
+    @classmethod
+    def configure_parser(cls, parser: ArgumentParser) -> None:
+        parser.add_argument("name")
 
-    plugins = dict(manifest.plugins)
-    del plugins[name]
-    write_manifest(manifest_path, plugins)
-    code = sync_run(manifest_path, lock_path, home)
-    if code == 0 and locked_plugin is not None:
-        _remove_plugin(locked_plugin, home)
-    return code
+    @classmethod
+    def run(cls, args: Namespace) -> int:
+        config = get_config()
+        name = args.name
+        manifest_path = config.bnpm_manifest_path
+        lock_path = config.bnpm_lock_path
+        home = config.bnpm_plugin_dir
+
+        ensure_clean_manifest_lock(manifest_path, lock_path)
+        manifest = load_manifest(manifest_path)
+        if name not in manifest.plugins:
+            print(f"bnpm: plugin {name!r} is not in bnpm.toml", file=sys.stderr)
+            return 1
+
+        lockfile = load_lockfile(lock_path)
+        locked_plugin = next((plugin for plugin in lockfile.plugins if plugin.name == name), None)
+
+        plugins = dict(manifest.plugins)
+        del plugins[name]
+        write_manifest(manifest_path, plugins)
+        code = sync_plugins(manifest_path, lock_path, home)
+        if code == 0 and locked_plugin is not None:
+            _remove_plugin(locked_plugin, home)
+        return code
 
 
 def _remove_plugin(plugin: LockedPlugin, home: Path) -> None:

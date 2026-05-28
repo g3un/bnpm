@@ -23,7 +23,7 @@ class CliTests(unittest.TestCase):
         )
 
     def test_setup_runs_plugin_and_venv_setup(self):
-        with patch.object(cli_main, "get_config", return_value=self.config()), patch(
+        with patch(
             "bnpm.cli.setup.setup_bn",
             return_value=Path("plugins/bnpm"),
         ) as setup_bn, patch(
@@ -43,7 +43,7 @@ class CliTests(unittest.TestCase):
     def test_sync_uses_config_paths(self):
         config = self.config()
 
-        with patch.object(cli_main, "get_config", return_value=config), patch(
+        with patch("bnpm.cli.sync.get_config", return_value=config), patch(
             "bnpm.cli.sync.sync",
             return_value=[],
         ) as sync:
@@ -60,7 +60,7 @@ class CliTests(unittest.TestCase):
     def test_verify_uses_config_paths(self):
         config = self.config()
 
-        with patch.object(cli_main, "get_config", return_value=config), patch(
+        with patch("bnpm.cli.verify.get_config", return_value=config), patch(
             "bnpm.cli.verify.verify_plugins",
             return_value=[],
         ) as verify:
@@ -70,7 +70,7 @@ class CliTests(unittest.TestCase):
         verify.assert_called_once_with(lock_path=config.bnpm_lock_path, home=config.bnpm_plugin_dir)
 
     def test_bnpm_error_returns_one(self):
-        with patch.object(cli_main, "get_config", return_value=self.config()), patch(
+        with patch(
             "bnpm.cli.setup.setup_bn",
             side_effect=BnpmError("failed"),
         ):

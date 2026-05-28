@@ -13,7 +13,7 @@ from unittest.mock import Mock, patch
 from bnpm.lockfile import LockedPackage, load_lockfile
 from bnpm.packages import _install_requirements, install_packages
 from bnpm.sync import sync
-from bnpm.cli.add import run as add_run
+from bnpm.cli.main import run_cli
 from bnpm.utils.locations import (
     resolve_package_dir,
     convert_path_to_file_uri,
@@ -62,17 +62,15 @@ requests>=2.31,<3
                     ),
                 ],
             ):
-                code = add_run(
-                    "local",
-                    None,
-                    str(plugin),
-                    None,
-                    None,
-                    None,
-                    manifest,
-                    root / "bnpm.lock",
-                    root / "home",
-                )
+                with patch(
+                    "bnpm.cli.add.get_config",
+                    return_value=types.SimpleNamespace(
+                        bnpm_manifest_path=manifest,
+                        bnpm_lock_path=root / "bnpm.lock",
+                        bnpm_plugin_dir=root / "home",
+                    ),
+                ):
+                    code = run_cli(["add", "local", "--path", str(plugin)])
 
             self.assertEqual(code, 0)
             lockfile = load_lockfile(root / "bnpm.lock")

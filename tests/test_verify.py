@@ -3,13 +3,14 @@ from __future__ import annotations
 import contextlib
 import io
 import tempfile
+import types
 from pathlib import Path
 import unittest
 
+from bnpm.cli.main import run_cli
 from bnpm.installed import write_installed_plugin
 from bnpm.utils.hash import compute_tree_sha256
 from bnpm.lockfile import LockedPlugin, write_lockfile
-from bnpm.cli.verify import run as verify_run
 from bnpm.utils.locations import (
     resolve_plugin_dir,
 )
@@ -40,8 +41,8 @@ class VerifyTests(unittest.TestCase):
             write_lockfile(lock, [locked])
 
             stderr = io.StringIO()
-            with contextlib.redirect_stderr(stderr):
-                code = verify_run(root / "bnpm.lock", home)
+            with patch_verify_config(root / "bnpm.lock", home), contextlib.redirect_stderr(stderr):
+                code = run_cli(["verify"])
 
             self.assertEqual(code, 1)
             self.assertIn("tampered: checksum mismatch", stderr.getvalue())
@@ -65,8 +66,8 @@ class VerifyTests(unittest.TestCase):
             write_lockfile(lock, [locked])
 
             stdout = io.StringIO()
-            with contextlib.redirect_stdout(stdout):
-                code = verify_run(root / "bnpm.lock", home)
+            with patch_verify_config(root / "bnpm.lock", home), contextlib.redirect_stdout(stdout):
+                code = run_cli(["verify"])
 
             self.assertEqual(code, 0)
             self.assertIn("verified stable", stdout.getvalue())
@@ -90,11 +91,23 @@ class VerifyTests(unittest.TestCase):
             )
 
             stderr = io.StringIO()
-            with contextlib.redirect_stderr(stderr):
-                code = verify_run(root / "bnpm.lock", home)
+            with patch_verify_config(root / "bnpm.lock", home), contextlib.redirect_stderr(stderr):
+                code = run_cli(["verify"])
 
             self.assertEqual(code, 1)
             self.assertIn("missing: missing plugin path", stderr.getvalue())
+
+
+def patch_verify_config(lock_path: Path, home: Path):
+    from unittest.mock import patch
+
+    return patch(
+        "bnpm.cli.verify.get_config",
+        return_value=types.SimpleNamespace(
+            bnpm_lock_path=lock_path,
+            bnpm_plugin_dir=home,
+        ),
+    )
 
 
 

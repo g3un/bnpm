@@ -1,32 +1,36 @@
 from __future__ import annotations
 
 import argparse
+from collections.abc import Sequence
+
+from .add import AddCommand
+from .command import Command
+from .list import ListCommand
+from .remove import RemoveCommand
+from .setup import SetupCommand
+from .sync import SyncCommand
+from .update import UpdateCommand
+from .verify import VerifyCommand
 
 
-def build_parser() -> argparse.ArgumentParser:
+DEFAULT_COMMANDS: tuple[type[Command], ...] = (
+    AddCommand,
+    RemoveCommand,
+    UpdateCommand,
+    SyncCommand,
+    VerifyCommand,
+    ListCommand,
+    SetupCommand,
+)
+
+
+def build_parser(commands: Sequence[type[Command]] = DEFAULT_COMMANDS) -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="bnpm")
 
     subparsers = parser.add_subparsers(dest="command", required=True)
-
-    add_parser = subparsers.add_parser("add")
-    add_parser.add_argument("name")
-    source_group = add_parser.add_mutually_exclusive_group(required=True)
-    source_group.add_argument("--git")
-    source_group.add_argument("--path")
-    ref_group = add_parser.add_mutually_exclusive_group()
-    ref_group.add_argument("--tag")
-    ref_group.add_argument("--branch")
-    ref_group.add_argument("--rev")
-
-    remove_parser = subparsers.add_parser("remove")
-    remove_parser.add_argument("name")
-
-    update_parser = subparsers.add_parser("update")
-    update_parser.add_argument("names", nargs="*")
-
-    subparsers.add_parser("sync")
-    subparsers.add_parser("verify")
-    subparsers.add_parser("list")
-    subparsers.add_parser("setup")
+    for command in commands:
+        command_parser = subparsers.add_parser(command.name)
+        command.configure_parser(command_parser)
+        command_parser.set_defaults(command_handler=command)
 
     return parser
