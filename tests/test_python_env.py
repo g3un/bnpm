@@ -6,7 +6,12 @@ import types
 import unittest
 from unittest.mock import patch
 
-from bnpm.utils.python_env import resolve_bn_python_version, resolve_package_python_executable, build_uv_target_options
+from bnpm.utils.python_env import (
+    build_uv_target_options,
+    resolve_bn_python_major_minor,
+    resolve_bn_python_version,
+    resolve_package_python_executable,
+)
 from tests.helpers import clear_bnpm_caches
 
 
@@ -44,6 +49,7 @@ class PythonEnvTests(unittest.TestCase):
             return_value="3.12.4",
         ):
             self.assertEqual(resolve_bn_python_version(), "3.12.4")
+            self.assertEqual(resolve_bn_python_major_minor(), "3.12")
             self.assertEqual(build_uv_target_options(), ["--python-version", "3.12"])
 
 

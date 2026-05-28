@@ -9,7 +9,7 @@ from pathlib import Path
 from .config import get_config
 from .errors import BnpmError
 from .helpers import find_bn_install_path
-from .utils.python_env import resolve_bn_python_version, resolve_venv_python
+from .utils.python_env import resolve_bn_python_major_minor, resolve_venv_python
 
 
 IGNORED_NAMES = {
@@ -33,7 +33,7 @@ def setup_bnpm_venv(venv_path: Path | None = None) -> Path:
     venv_path = venv_path.expanduser().resolve() if venv_path else get_config().bnpm_venv_dir
     venv_path.parent.mkdir(parents=True, exist_ok=True)
     if not resolve_venv_python(venv_path).exists():
-        _create_venv(venv_path, resolve_bn_python_version())
+        _create_venv(venv_path, resolve_bn_python_major_minor())
 
     install_api = resolve_bn_install_api()
     if install_api is None:

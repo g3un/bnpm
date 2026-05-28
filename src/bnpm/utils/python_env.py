@@ -26,9 +26,15 @@ def resolve_package_python_executable() -> str:
 
 
 def build_uv_target_options() -> list[str]:
+    return ["--python-version", resolve_bn_python_major_minor()]
+
+
+def resolve_bn_python_major_minor() -> str:
     version = resolve_bn_python_version()
-    major_minor = ".".join(version.split(".")[:2])
-    return ["--python-version", major_minor]
+    parts = version.split(".")
+    if len(parts) < 2:
+        raise BnpmError(f"invalid Binary Ninja Python version: {version}")
+    return ".".join(parts[:2])
 
 
 @cache

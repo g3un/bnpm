@@ -67,25 +67,29 @@ site_packages.joinpath("binaryninja.py").write_text("API_VERSION = 'test'\\n", e
             )
             venv_path = root / "venv"
 
+            created_versions = []
+
             def create_venv(path, python_version):
                 import venv
 
+                created_versions.append(python_version)
                 venv.EnvBuilder(with_pip=True).create(path)
 
             with patch("bnpm.setup.resolve_bn_install_api", return_value=install_api), patch(
-                "bnpm.setup.resolve_bn_python_version",
-                return_value="3.10.10",
+                "bnpm.setup.resolve_bn_python_major_minor",
+                return_value="3.10",
             ), patch("bnpm.setup._create_venv", side_effect=create_venv):
                 result = setup_bnpm_venv(venv_path)
 
             self.assertEqual(result, venv_path.resolve())
             self.assertTrue(venv_path.joinpath("pyvenv.cfg").exists())
+            self.assertEqual(created_versions, ["3.10"])
 
     def test_setup_bnpm_venv_reports_missing_install_api(self):
         with tempfile.TemporaryDirectory() as temp:
             venv_path = Path(temp) / "venv"
 
-            with patch("bnpm.setup.resolve_bn_python_version", return_value="3.10.10"), patch(
+            with patch("bnpm.setup.resolve_bn_python_major_minor", return_value="3.10"), patch(
                 "bnpm.setup._create_venv",
             ), patch("bnpm.setup.resolve_bn_install_api", return_value=None):
                 with self.assertRaisesRegex(Exception, "could not find Binary Ninja scripts/install_api.py"):
@@ -99,7 +103,7 @@ site_packages.joinpath("binaryninja.py").write_text("API_VERSION = 'test'\\n", e
             install_api.parent.mkdir(parents=True)
             install_api.write_text("raise SystemExit(1)\n", encoding="utf-8")
 
-            with patch("bnpm.setup.resolve_bn_python_version", return_value="3.10.10"), patch(
+            with patch("bnpm.setup.resolve_bn_python_major_minor", return_value="3.10"), patch(
                 "bnpm.setup._create_venv",
             ), patch("bnpm.setup.resolve_bn_install_api", return_value=install_api), patch(
                 "bnpm.setup._run_venv_python",
