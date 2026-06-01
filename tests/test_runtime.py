@@ -140,6 +140,39 @@ tool_bnpm = { path = "plugin" }
 
             self.assertEqual(marker.read_text(encoding="utf-8"), "ok")
 
+    def test_runtime_package_dir_processes_pth_files(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            home = root / "home"
+            packages = resolve_package_dir(home)
+            packages.mkdir(parents=True)
+            extra = packages / "extra"
+            extra.mkdir()
+            extra.joinpath("pth_dependency.py").write_text("VALUE = 'ok'\n", encoding="utf-8")
+            packages.joinpath("dependency.pth").write_text("extra\n", encoding="utf-8")
+            plugin = root / "plugin"
+            plugin.mkdir()
+            marker = root / "loaded.txt"
+            plugin.joinpath("__init__.py").write_text(
+                f"from pathlib import Path\nimport pth_dependency\nPath({str(marker)!r}).write_text(pth_dependency.VALUE, encoding='utf-8')\n",
+                encoding="utf-8",
+            )
+            lock = root / "bnpm.lock"
+            write_lockfile(
+                lock,
+                [
+                    LockedPlugin(
+                        name="pth-local",
+                        source=convert_path_to_file_uri(plugin),
+                        checksum=compute_tree_sha256(plugin),
+                    )
+                ],
+            )
+
+            activate(lock_path=lock, home=home)
+
+            self.assertEqual(marker.read_text(encoding="utf-8"), "ok")
+
     def test_plugin_python_env_adds_plugin_and_dependency_paths(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

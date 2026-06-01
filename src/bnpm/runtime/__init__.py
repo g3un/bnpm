@@ -32,14 +32,17 @@ def activate(lock_path: Path | None = None, home: Path | None = None) -> None:
 
 
 def _add_package_dir(home: Path) -> None:
+    import site
     import sys
 
     path = resolve_package_dir(home)
     if not path.exists():
         return
     package_path = str(path)
-    if package_path not in sys.path:
-        sys.path.insert(0, package_path)
+    site.addsitedir(package_path)
+    if package_path in sys.path:
+        sys.path.remove(package_path)
+    sys.path.insert(0, package_path)
 
 
 __all__ = [
