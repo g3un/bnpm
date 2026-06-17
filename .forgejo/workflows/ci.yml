@@ -11,6 +11,9 @@ jobs:
     runs-on: codeberg-small
     container:
       image: ghcr.io/astral-sh/uv:python3.10-alpine
+    defaults:
+      run:
+        shell: sh
 
     steps:
       - name: Install CI prerequisites
