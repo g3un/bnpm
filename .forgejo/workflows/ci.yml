@@ -8,7 +8,7 @@ on:
 
 jobs:
   checks:
-    runs-on: codeberg-tiny
+    runs-on: codeberg-small
     container:
       image: ghcr.io/astral-sh/uv:python3.10-alpine
 
