@@ -243,6 +243,10 @@ local = {{ path = "{str(plugin).replace(chr(92), chr(92) * 2)}" }}
             with (
                 patch("bnpm.packages.subprocess.run", run),
                 patch(
+                    "bnpm.packages.build_uv_target_options",
+                    return_value=["--python-version", "3.10"],
+                ),
+                patch(
                     "bnpm.utils.python_env.get_config",
                     return_value=types.SimpleNamespace(bnpm_venv_python=python),
                 ),
@@ -274,6 +278,10 @@ local = {{ path = "{str(plugin).replace(chr(92), chr(92) * 2)}" }}
 
             with (
                 patch("bnpm.packages.subprocess.run", run),
+                patch(
+                    "bnpm.packages.build_uv_target_options",
+                    return_value=["--python-version", "3.10"],
+                ),
                 patch(
                     "bnpm.utils.python_env.get_config",
                     return_value=types.SimpleNamespace(bnpm_venv_python=python),
@@ -307,6 +315,10 @@ local = {{ path = "{str(plugin).replace(chr(92), chr(92) * 2)}" }}
             with (
                 patch("bnpm.packages.subprocess.run", run),
                 patch(
+                    "bnpm.packages.build_uv_target_options",
+                    return_value=["--python-version", "3.10"],
+                ),
+                patch(
                     "bnpm.utils.python_env.get_config",
                     return_value=types.SimpleNamespace(bnpm_venv_python=python),
                 ),
@@ -336,6 +348,10 @@ local = {{ path = "{str(plugin).replace(chr(92), chr(92) * 2)}" }}
 
             with (
                 patch("bnpm.packages.subprocess.run", run),
+                patch(
+                    "bnpm.packages.build_uv_target_options",
+                    return_value=["--python-version", "3.10"],
+                ),
                 patch(
                     "bnpm.utils.python_env.get_config",
                     return_value=types.SimpleNamespace(bnpm_venv_python=python),

@@ -57,13 +57,18 @@ def resolve_bn_install_api() -> Path | None:
     root = find_bn_install_path()
     if root is None:
         return None
-    if platform.system() == "Darwin":
-        path = root / "Contents" / "Resources" / "scripts" / "install_api.py"
-    else:
-        path = root / "scripts" / "install_api.py"
-    if not path.exists():
-        return None
-    return path.resolve()
+
+    bundle_path = root / "Contents" / "Resources" / "scripts" / "install_api.py"
+    plain_path = root / "scripts" / "install_api.py"
+    candidates = (
+        [bundle_path, plain_path]
+        if platform.system() == "Darwin"
+        else [plain_path, bundle_path]
+    )
+    for path in candidates:
+        if path.exists():
+            return path.resolve()
+    return None
 
 
 def _run_venv_python(venv_path: Path, args: list[str]) -> None:
