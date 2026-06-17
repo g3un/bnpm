@@ -9,7 +9,9 @@ from ..sync import sync
 from .logs import log_error, log_info, log_warning
 
 
-def sync_stale_manifest_if_needed(lock_path: Path, home: Path, lockfile: Lockfile) -> Lockfile:
+def sync_stale_manifest_if_needed(
+    lock_path: Path, home: Path, lockfile: Lockfile
+) -> Lockfile:
     manifest_path = lock_path.with_name("bnpm.toml")
     try:
         collect_manifest_plugins = load_manifest_plugins(manifest_path)
@@ -76,8 +78,3 @@ def _is_positive_message_box_result(result, result_type=None) -> bool:
             return True
     name = getattr(result, "name", str(result))
     return name in {"YesButton", "OKButton"}
-
-
-
-
-

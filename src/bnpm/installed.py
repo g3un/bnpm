@@ -79,6 +79,3 @@ def _read_optional_str(data: dict[str, object], key: str) -> str | None:
 
 def _escape(value: str) -> str:
     return value.replace("\\", "\\\\").replace('"', '\\"')
-
-
-

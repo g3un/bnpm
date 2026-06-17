@@ -31,7 +31,9 @@ try:
             return
         try:
             log_info("sync started", logger="BNPM")
-            installed = sync(report_progress=lambda message: log_info(message, logger="BNPM"))
+            installed = sync(
+                report_progress=lambda message: log_info(message, logger="BNPM")
+            )
             log_info(f"synced {len(installed)} plugin(s)", logger="BNPM")
             activate()
         except Exception as exc:
@@ -39,7 +41,9 @@ try:
         finally:
             _sync_lock.release()
 
-    PluginCommand.register("BNPM\\Sync", "Sync BNPM plugins from bnpm.toml", sync_plugins)
+    PluginCommand.register(
+        "BNPM\\Sync", "Sync BNPM plugins from bnpm.toml", sync_plugins
+    )
 except Exception as exc:
     try:
         from binaryninja import log_error
@@ -47,6 +51,3 @@ except Exception as exc:
         log_error(f"failed to activate: {exc}", logger="BNPM")
     except Exception:
         raise
-
-
-

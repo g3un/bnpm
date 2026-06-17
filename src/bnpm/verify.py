@@ -9,7 +9,9 @@ from .models import LockedPlugin, VerificationResult
 from .utils.locations import resolve_plugin_dir_from_lock
 
 
-def verify_plugins(lock_path: Path | None = None, home: Path | None = None) -> list[VerificationResult]:
+def verify_plugins(
+    lock_path: Path | None = None, home: Path | None = None
+) -> list[VerificationResult]:
     config = get_config()
     lock_path = lock_path or config.bnpm_lock_path
     home = home or config.bnpm_plugin_dir
@@ -48,6 +50,3 @@ def _verify_plugin(plugin: LockedPlugin, home: Path) -> VerificationResult:
         ok=False,
         message=f"checksum mismatch: expected {plugin.checksum}, got {actual}",
     )
-
-
-

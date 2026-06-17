@@ -12,7 +12,9 @@ from .utils.python_env import resolve_package_python_executable, build_uv_target
 from .utils.locations import resolve_package_dir
 
 
-def install_packages(requirements: list[str], home: Path, report_progress=None) -> list[LockedPackage]:
+def install_packages(
+    requirements: list[str], home: Path, report_progress=None
+) -> list[LockedPackage]:
     target = resolve_package_dir(home)
     if not requirements:
         target.mkdir(parents=True, exist_ok=True)
@@ -32,7 +34,10 @@ def install_packages(requirements: list[str], home: Path, report_progress=None) 
             encoding="utf-8",
             newline="",
         )
-        _report_progress(report_progress, f"installing {len(set(requirements))} package requirement(s) into {target}")
+        _report_progress(
+            report_progress,
+            f"installing {len(set(requirements))} package requirement(s) into {target}",
+        )
         _install_requirements(requirements_path, target)
         packages = _collect_packages_from_target(target)
         _report_progress(report_progress, f"installed {len(packages)} package(s)")
@@ -71,7 +76,9 @@ def _run_uv_install(requirements_path: Path, target: Path) -> None:
         check=False,
     )
     if result.returncode != 0:
-        message = result.stderr.strip() or result.stdout.strip() or "uv pip install failed"
+        message = (
+            result.stderr.strip() or result.stdout.strip() or "uv pip install failed"
+        )
         raise BnpmError(message)
 
 
@@ -96,7 +103,9 @@ def _run_pip_install(requirements_path: Path, target: Path) -> None:
         raise BnpmError(message)
 
 
-def _build_pip_install_command(python: str, requirements_path: Path, target: Path) -> list[str]:
+def _build_pip_install_command(
+    python: str, requirements_path: Path, target: Path
+) -> list[str]:
     return [
         python,
         "-m",
@@ -124,7 +133,9 @@ def _ensure_pip() -> None:
         check=False,
     )
     if result.returncode != 0:
-        message = result.stderr.strip() or result.stdout.strip() or "pip is not available"
+        message = (
+            result.stderr.strip() or result.stdout.strip() or "pip is not available"
+        )
         raise BnpmError(message)
 
 
@@ -143,9 +154,3 @@ def _collect_packages_from_target(target: Path) -> list[LockedPackage]:
             )
         )
     return packages
-
-
-
-
-
-

@@ -7,6 +7,7 @@ import unittest
 from bnpm.lockfile import LockedPackage, LockedPlugin, load_lockfile, write_lockfile
 from bnpm.status import load_manifest_plugins, collect_lock_mismatches
 
+
 class LockfileTests(unittest.TestCase):
     def test_round_trip(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -80,7 +81,9 @@ dependencies = "requests"
                 encoding="utf-8",
             )
 
-            with self.assertRaisesRegex(ValueError, "plugins.dependencies must be a list of strings"):
+            with self.assertRaisesRegex(
+                ValueError, "plugins.dependencies must be a list of strings"
+            ):
                 load_lockfile(path)
 
     def test_write_lockfile_does_not_leave_temp_files(self):
@@ -122,9 +125,13 @@ local = { path = "plugin" }
             write_lockfile(lock, [])
 
             collect_manifest_plugins = load_manifest_plugins(manifest)
-            mismatches = collect_lock_mismatches(collect_manifest_plugins, load_lockfile(lock))
+            mismatches = collect_lock_mismatches(
+                collect_manifest_plugins, load_lockfile(lock)
+            )
 
-        self.assertEqual(mismatches, ["plugin 'local' is in bnpm.toml but not bnpm.lock"])
+        self.assertEqual(
+            mismatches, ["plugin 'local' is in bnpm.toml but not bnpm.lock"]
+        )
 
     def test_manifest_lock_mismatch_detects_source_change(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -156,9 +163,8 @@ local = { path = "second" }
             )
 
             collect_manifest_plugins = load_manifest_plugins(manifest)
-            mismatches = collect_lock_mismatches(collect_manifest_plugins, load_lockfile(lock))
+            mismatches = collect_lock_mismatches(
+                collect_manifest_plugins, load_lockfile(lock)
+            )
 
         self.assertEqual(mismatches, ["plugin 'local' source changed"])
-
-
-

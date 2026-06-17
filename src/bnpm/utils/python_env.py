@@ -46,4 +46,3 @@ def resolve_bn_python_version() -> str:
     if version is None:
         raise BnpmError("could not determine Binary Ninja Python version")
     return version
-

@@ -20,6 +20,7 @@ from bnpm.utils.locations import (
 )
 from tests.helpers import clear_bnpm_caches
 
+
 class PackagesTests(unittest.TestCase):
     def setUp(self):
         clear_bnpm_caches()
@@ -74,7 +75,9 @@ requests>=2.31,<3
 
             self.assertEqual(code, 0)
             lockfile = load_lockfile(root / "bnpm.lock")
-            self.assertEqual(lockfile.plugins[0].dependencies, ["requests==2.32.3", "tomli==2.4.1"])
+            self.assertEqual(
+                lockfile.plugins[0].dependencies, ["requests==2.32.3", "tomli==2.4.1"]
+            )
             packages = {package.name: package for package in lockfile.packages}
             self.assertEqual(packages["requests"].dependencies, ["urllib3==2.5.0"])
 
@@ -84,7 +87,9 @@ requests>=2.31,<3
             plugin = root / "plugin"
             plugin.mkdir()
             plugin.joinpath("__init__.py").write_text("", encoding="utf-8")
-            plugin.joinpath("requirements.txt").write_text("requests>=2.31,<3\n", encoding="utf-8")
+            plugin.joinpath("requirements.txt").write_text(
+                "requests>=2.31,<3\n", encoding="utf-8"
+            )
             manifest = root / "bnpm.toml"
             manifest.write_text(
                 f"""
@@ -110,16 +115,23 @@ local = {{ path = "{str(plugin).replace(chr(92), chr(92) * 2)}" }}
                         name="urllib3",
                         source="pypi",
                         version="pypi:2.5.0",
-                    )
+                    ),
                 ],
             ) as install_packages:
-                sync(manifest_path=manifest, lock_path=root / "bnpm.lock", home=root / "home")
+                sync(
+                    manifest_path=manifest,
+                    lock_path=root / "bnpm.lock",
+                    home=root / "home",
+                )
                 code = 0
 
             lockfile = load_lockfile(root / "bnpm.lock")
             self.assertEqual(code, 0)
             install_packages.assert_called_once()
-            self.assertEqual(install_packages.call_args.args, (["requests>=2.31,<3"], (root / "home").resolve()))
+            self.assertEqual(
+                install_packages.call_args.args,
+                (["requests>=2.31,<3"], (root / "home").resolve()),
+            )
             self.assertEqual(lockfile.plugins[0].dependencies, ["requests==2.32.3"])
             self.assertEqual(lockfile.packages[0].name, "requests")
             self.assertEqual(lockfile.packages[0].version, "pypi:2.32.3")
@@ -138,7 +150,9 @@ dependencies = ["requests>=2.31,<3"]
 """.strip(),
                 encoding="utf-8",
             )
-            plugin.joinpath("requirements.txt").write_text("tomli>=1.1\n", encoding="utf-8")
+            plugin.joinpath("requirements.txt").write_text(
+                "tomli>=1.1\n", encoding="utf-8"
+            )
             manifest = root / "bnpm.toml"
             manifest.write_text(
                 f"""
@@ -153,7 +167,9 @@ local = {{ path = "{str(plugin).replace(chr(92), chr(92) * 2)}" }}
             with patch(
                 "bnpm.sync.install_packages",
                 return_value=[
-                    LockedPackage(name="requests", source="pypi", version="pypi:2.32.3"),
+                    LockedPackage(
+                        name="requests", source="pypi", version="pypi:2.32.3"
+                    ),
                     LockedPackage(name="tomli", source="pypi", version="pypi:2.4.1"),
                 ],
             ) as install_packages:
@@ -171,7 +187,10 @@ local = {{ path = "{str(plugin).replace(chr(92), chr(92) * 2)}" }}
             self.assertEqual(code, 0)
             self.assertIn("requirements.txt", err.getvalue())
             install_packages.assert_called_once()
-            self.assertEqual(install_packages.call_args.args, (["requests>=2.31,<3"], (root / "home").resolve()))
+            self.assertEqual(
+                install_packages.call_args.args,
+                (["requests>=2.31,<3"], (root / "home").resolve()),
+            )
             self.assertEqual(lockfile.plugins[0].dependencies, ["requests==2.32.3"])
             self.assertNotIn("tomli==2.4.1", lockfile.plugins[0].dependencies or [])
 
@@ -181,11 +200,16 @@ local = {{ path = "{str(plugin).replace(chr(92), chr(92) * 2)}" }}
             requirements_path = root / "requirements.txt"
             target = root / "packages"
             requirements_path.write_text("requests\n", encoding="utf-8")
-            run = Mock(return_value=types.SimpleNamespace(returncode=0, stdout="", stderr=""))
+            run = Mock(
+                return_value=types.SimpleNamespace(returncode=0, stdout="", stderr="")
+            )
 
-            with patch("bnpm.packages.subprocess.run", run), patch(
-                "bnpm.packages.build_uv_target_options",
-                return_value=["--python-version", "3.10"],
+            with (
+                patch("bnpm.packages.subprocess.run", run),
+                patch(
+                    "bnpm.packages.build_uv_target_options",
+                    return_value=["--python-version", "3.10"],
+                ),
             ):
                 _install_requirements(requirements_path, target)
 
@@ -216,9 +240,12 @@ local = {{ path = "{str(plugin).replace(chr(92), chr(92) * 2)}" }}
             python.parent.mkdir(parents=True)
             python.write_text("", encoding="utf-8")
 
-            with patch("bnpm.packages.subprocess.run", run), patch(
-                "bnpm.utils.python_env.get_config",
-                return_value=types.SimpleNamespace(bnpm_venv_python=python),
+            with (
+                patch("bnpm.packages.subprocess.run", run),
+                patch(
+                    "bnpm.utils.python_env.get_config",
+                    return_value=types.SimpleNamespace(bnpm_venv_python=python),
+                ),
             ):
                 _install_requirements(requirements_path, target)
 
@@ -245,9 +272,12 @@ local = {{ path = "{str(plugin).replace(chr(92), chr(92) * 2)}" }}
             python.parent.mkdir(parents=True)
             python.write_text("", encoding="utf-8")
 
-            with patch("bnpm.packages.subprocess.run", run), patch(
-                "bnpm.utils.python_env.get_config",
-                return_value=types.SimpleNamespace(bnpm_venv_python=python),
+            with (
+                patch("bnpm.packages.subprocess.run", run),
+                patch(
+                    "bnpm.utils.python_env.get_config",
+                    return_value=types.SimpleNamespace(bnpm_venv_python=python),
+                ),
             ):
                 _install_requirements(requirements_path, target)
 
@@ -263,7 +293,9 @@ local = {{ path = "{str(plugin).replace(chr(92), chr(92) * 2)}" }}
             run = Mock(
                 side_effect=[
                     FileNotFoundError(),
-                    types.SimpleNamespace(returncode=1, stdout="", stderr="No module named pip"),
+                    types.SimpleNamespace(
+                        returncode=1, stdout="", stderr="No module named pip"
+                    ),
                     types.SimpleNamespace(returncode=0, stdout="", stderr=""),
                     types.SimpleNamespace(returncode=0, stdout="", stderr=""),
                 ]
@@ -272,13 +304,19 @@ local = {{ path = "{str(plugin).replace(chr(92), chr(92) * 2)}" }}
             python.parent.mkdir(parents=True)
             python.write_text("", encoding="utf-8")
 
-            with patch("bnpm.packages.subprocess.run", run), patch(
-                "bnpm.utils.python_env.get_config",
-                return_value=types.SimpleNamespace(bnpm_venv_python=python),
+            with (
+                patch("bnpm.packages.subprocess.run", run),
+                patch(
+                    "bnpm.utils.python_env.get_config",
+                    return_value=types.SimpleNamespace(bnpm_venv_python=python),
+                ),
             ):
                 _install_requirements(requirements_path, target)
 
-            self.assertEqual(run.call_args_list[2].args[0], [str(python), "-m", "ensurepip", "--upgrade"])
+            self.assertEqual(
+                run.call_args_list[2].args[0],
+                [str(python), "-m", "ensurepip", "--upgrade"],
+            )
 
     def test_package_install_reports_pip_failure(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -296,9 +334,12 @@ local = {{ path = "{str(plugin).replace(chr(92), chr(92) * 2)}" }}
             python.parent.mkdir(parents=True)
             python.write_text("", encoding="utf-8")
 
-            with patch("bnpm.packages.subprocess.run", run), patch(
-                "bnpm.utils.python_env.get_config",
-                return_value=types.SimpleNamespace(bnpm_venv_python=python),
+            with (
+                patch("bnpm.packages.subprocess.run", run),
+                patch(
+                    "bnpm.utils.python_env.get_config",
+                    return_value=types.SimpleNamespace(bnpm_venv_python=python),
+                ),
             ):
                 with self.assertRaisesRegex(Exception, "pip failed"):
                     _install_requirements(requirements_path, target)
@@ -336,7 +377,11 @@ local = { path = "../plugin" }
             try:
                 os.chdir(cwd)
 
-                sync(manifest_path=manifest, lock_path=config / "bnpm.lock", home=root / "home")
+                sync(
+                    manifest_path=manifest,
+                    lock_path=config / "bnpm.lock",
+                    home=root / "home",
+                )
                 code = 0
             finally:
                 os.chdir(old_cwd)
@@ -345,11 +390,3 @@ local = { path = "../plugin" }
             self.assertEqual(code, 0)
             self.assertEqual(len(locked), 1)
             self.assertEqual(locked[0].source, convert_path_to_file_uri(plugin))
-
-
-
-
-
-
-
-

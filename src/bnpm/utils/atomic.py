@@ -5,7 +5,9 @@ from pathlib import Path
 import tempfile
 
 
-def write_text_atomically(path: Path, content: str, *, allow_direct_fallback: bool = False) -> None:
+def write_text_atomically(
+    path: Path, content: str, *, allow_direct_fallback: bool = False
+) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, temp_name = tempfile.mkstemp(
         dir=path.parent,
@@ -29,4 +31,3 @@ def write_text_atomically(path: Path, content: str, *, allow_direct_fallback: bo
     except Exception:
         temp_path.unlink(missing_ok=True)
         raise
-

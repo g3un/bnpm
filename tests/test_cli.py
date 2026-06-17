@@ -26,13 +26,16 @@ class CliTests(unittest.TestCase):
         )
 
     def test_setup_runs_plugin_and_venv_setup(self):
-        with patch(
-            "bnpm.cli.setup.setup_bn",
-            return_value=Path("plugins/bnpm"),
-        ) as setup_bn, patch(
-            "bnpm.cli.setup.setup_bnpm_venv",
-            return_value=Path("bnpm/venv"),
-        ) as setup_venv:
+        with (
+            patch(
+                "bnpm.cli.setup.setup_bn",
+                return_value=Path("plugins/bnpm"),
+            ) as setup_bn,
+            patch(
+                "bnpm.cli.setup.setup_bnpm_venv",
+                return_value=Path("bnpm/venv"),
+            ) as setup_venv,
+        ):
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
                 code = cli_main.run_cli(["setup"])
@@ -46,10 +49,13 @@ class CliTests(unittest.TestCase):
     def test_sync_uses_config_paths(self):
         config = self.config()
 
-        with patch("bnpm.cli.sync.get_config", return_value=config), patch(
-            "bnpm.cli.sync.sync",
-            return_value=[],
-        ) as sync:
+        with (
+            patch("bnpm.cli.sync.get_config", return_value=config),
+            patch(
+                "bnpm.cli.sync.sync",
+                return_value=[],
+            ) as sync,
+        ):
             code = cli_main.run_cli(["sync"])
 
         self.assertEqual(code, 0)
@@ -63,14 +69,19 @@ class CliTests(unittest.TestCase):
     def test_verify_uses_config_paths(self):
         config = self.config()
 
-        with patch("bnpm.cli.verify.get_config", return_value=config), patch(
-            "bnpm.cli.verify.verify_plugins",
-            return_value=[],
-        ) as verify:
+        with (
+            patch("bnpm.cli.verify.get_config", return_value=config),
+            patch(
+                "bnpm.cli.verify.verify_plugins",
+                return_value=[],
+            ) as verify,
+        ):
             code = cli_main.run_cli(["verify"])
 
         self.assertEqual(code, 0)
-        verify.assert_called_once_with(lock_path=config.bnpm_lock_path, home=config.bnpm_plugin_dir)
+        verify.assert_called_once_with(
+            lock_path=config.bnpm_lock_path, home=config.bnpm_plugin_dir
+        )
 
     def test_remove_accepts_multiple_plugins(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -92,9 +103,24 @@ gamma = { git = "https://github.com/user/gamma.git" }
             write_lockfile(
                 lock,
                 [
-                    LockedPlugin("alpha", "https://github.com/user/alpha.git", "sha256:alpha", version="HEAD"),
-                    LockedPlugin("beta", "https://github.com/user/beta.git", "sha256:beta", version="HEAD"),
-                    LockedPlugin("gamma", "https://github.com/user/gamma.git", "sha256:gamma", version="HEAD"),
+                    LockedPlugin(
+                        "alpha",
+                        "https://github.com/user/alpha.git",
+                        "sha256:alpha",
+                        version="HEAD",
+                    ),
+                    LockedPlugin(
+                        "beta",
+                        "https://github.com/user/beta.git",
+                        "sha256:beta",
+                        version="HEAD",
+                    ),
+                    LockedPlugin(
+                        "gamma",
+                        "https://github.com/user/gamma.git",
+                        "sha256:gamma",
+                        version="HEAD",
+                    ),
                 ],
             )
             config = types.SimpleNamespace(
@@ -103,10 +129,13 @@ gamma = { git = "https://github.com/user/gamma.git" }
                 bnpm_plugin_dir=home,
             )
 
-            with patch("bnpm.cli.remove.get_config", return_value=config), patch(
-                "bnpm.cli.remove.sync_plugins",
-                return_value=0,
-            ) as sync:
+            with (
+                patch("bnpm.cli.remove.get_config", return_value=config),
+                patch(
+                    "bnpm.cli.remove.sync_plugins",
+                    return_value=0,
+                ) as sync,
+            ):
                 code = cli_main.run_cli(["remove", "alpha", "beta"])
 
             self.assertEqual(code, 0)
@@ -128,6 +157,3 @@ gamma = { git = "https://github.com/user/gamma.git" }
 
 if __name__ == "__main__":
     unittest.main()
-
-
-

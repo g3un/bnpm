@@ -7,7 +7,12 @@ import unittest
 from unittest.mock import Mock, call, patch
 
 from bnpm.helpers import find_bn_install_path, get_bn_python_version
-from bnpm.setup import _run_venv_python, resolve_bn_install_api, setup_bn, setup_bnpm_venv
+from bnpm.setup import (
+    _run_venv_python,
+    resolve_bn_install_api,
+    setup_bn,
+    setup_bnpm_venv,
+)
 from tests.helpers import clear_bnpm_caches
 
 
@@ -47,8 +52,12 @@ class SetupTests(unittest.TestCase):
             root = Path(temp)
             plugin_dir = root / "plugins"
             plugin_dir.joinpath("bnpm").mkdir(parents=True)
-            with patch("bnpm.setup.shutil.rmtree", side_effect=PermissionError("locked")):
-                with self.assertRaisesRegex(Exception, "could not replace Binary Ninja plugin directory"):
+            with patch(
+                "bnpm.setup.shutil.rmtree", side_effect=PermissionError("locked")
+            ):
+                with self.assertRaisesRegex(
+                    Exception, "could not replace Binary Ninja plugin directory"
+                ):
                     setup_bn(plugin_dir)
 
     def test_setup_bnpm_venv_installs_binaryninja_api(self):
@@ -68,10 +77,15 @@ site_packages.joinpath("binaryninja.py").write_text("API_VERSION = 'test'\\n", e
             )
             venv_path = root / "venv"
 
-            with patch("bnpm.setup.resolve_bn_install_api", return_value=install_api), patch(
-                "bnpm.setup.resolve_bn_python_major_minor",
-                return_value="3.10",
-            ), patch("bnpm.setup._create_venv") as create_venv, patch("bnpm.setup._run_venv_python") as run_python:
+            with (
+                patch("bnpm.setup.resolve_bn_install_api", return_value=install_api),
+                patch(
+                    "bnpm.setup.resolve_bn_python_major_minor",
+                    return_value="3.10",
+                ),
+                patch("bnpm.setup._create_venv") as create_venv,
+                patch("bnpm.setup._run_venv_python") as run_python,
+            ):
                 result = setup_bnpm_venv(venv_path)
 
             self.assertEqual(result, venv_path.resolve())
@@ -88,10 +102,16 @@ site_packages.joinpath("binaryninja.py").write_text("API_VERSION = 'test'\\n", e
         with tempfile.TemporaryDirectory() as temp:
             venv_path = Path(temp) / "venv"
 
-            with patch("bnpm.setup.resolve_bn_python_major_minor", return_value="3.10"), patch(
-                "bnpm.setup._create_venv",
-            ), patch("bnpm.setup.resolve_bn_install_api", return_value=None):
-                with self.assertRaisesRegex(Exception, "could not find Binary Ninja scripts/install_api.py"):
+            with (
+                patch("bnpm.setup.resolve_bn_python_major_minor", return_value="3.10"),
+                patch(
+                    "bnpm.setup._create_venv",
+                ),
+                patch("bnpm.setup.resolve_bn_install_api", return_value=None),
+            ):
+                with self.assertRaisesRegex(
+                    Exception, "could not find Binary Ninja scripts/install_api.py"
+                ):
                     setup_bnpm_venv(venv_path)
 
     def test_setup_bnpm_venv_reports_install_api_failure(self):
@@ -102,11 +122,16 @@ site_packages.joinpath("binaryninja.py").write_text("API_VERSION = 'test'\\n", e
             install_api.parent.mkdir(parents=True)
             install_api.write_text("raise SystemExit(1)\n", encoding="utf-8")
 
-            with patch("bnpm.setup.resolve_bn_python_major_minor", return_value="3.10"), patch(
-                "bnpm.setup._create_venv",
-            ), patch("bnpm.setup.resolve_bn_install_api", return_value=install_api), patch(
-                "bnpm.setup._run_venv_python",
-                side_effect=Exception("install failed"),
+            with (
+                patch("bnpm.setup.resolve_bn_python_major_minor", return_value="3.10"),
+                patch(
+                    "bnpm.setup._create_venv",
+                ),
+                patch("bnpm.setup.resolve_bn_install_api", return_value=install_api),
+                patch(
+                    "bnpm.setup._run_venv_python",
+                    side_effect=Exception("install failed"),
+                ),
             ):
                 with self.assertRaisesRegex(Exception, "install failed"):
                     setup_bnpm_venv(venv_path)
@@ -141,9 +166,12 @@ site_packages.joinpath("binaryninja.py").write_text("API_VERSION = 'test'\\n", e
             install_root.mkdir()
             user_dir.joinpath("lastrun").write_text(str(install_root), encoding="utf-8")
 
-            with patch("bnpm.helpers.bn.platform.system", return_value="Linux"), patch.dict(
-                os.environ,
-                {"BN_USER_DIRECTORY": str(user_dir)},
+            with (
+                patch("bnpm.helpers.bn.platform.system", return_value="Linux"),
+                patch.dict(
+                    os.environ,
+                    {"BN_USER_DIRECTORY": str(user_dir)},
+                ),
             ):
                 self.assertEqual(find_bn_install_path(), install_root)
 
@@ -158,9 +186,12 @@ site_packages.joinpath("binaryninja.py").write_text("API_VERSION = 'test'\\n", e
             binary.write_text("", encoding="utf-8")
             user_dir.joinpath("lastrun").write_text(str(binary), encoding="utf-8")
 
-            with patch("bnpm.helpers.bn.platform.system", return_value="Linux"), patch.dict(
-                os.environ,
-                {"BN_USER_DIRECTORY": str(user_dir)},
+            with (
+                patch("bnpm.helpers.bn.platform.system", return_value="Linux"),
+                patch.dict(
+                    os.environ,
+                    {"BN_USER_DIRECTORY": str(user_dir)},
+                ),
             ):
                 self.assertEqual(find_bn_install_path(), install_root)
 
@@ -175,9 +206,12 @@ site_packages.joinpath("binaryninja.py").write_text("API_VERSION = 'test'\\n", e
             binary.write_text("", encoding="utf-8")
             user_dir.joinpath("lastrun").write_text(str(binary), encoding="utf-8")
 
-            with patch("bnpm.helpers.bn.platform.system", return_value="Windows"), patch.dict(
-                os.environ,
-                {"BN_USER_DIRECTORY": str(user_dir)},
+            with (
+                patch("bnpm.helpers.bn.platform.system", return_value="Windows"),
+                patch.dict(
+                    os.environ,
+                    {"BN_USER_DIRECTORY": str(user_dir)},
+                ),
             ):
                 self.assertEqual(find_bn_install_path(), install_root)
 
@@ -187,9 +221,12 @@ site_packages.joinpath("binaryninja.py").write_text("API_VERSION = 'test'\\n", e
             user_dir = root / "user"
             user_dir.mkdir()
 
-            with patch("bnpm.helpers.bn.platform.system", return_value="Linux"), patch.dict(
-                os.environ,
-                {"BN_USER_DIRECTORY": str(user_dir)},
+            with (
+                patch("bnpm.helpers.bn.platform.system", return_value="Linux"),
+                patch.dict(
+                    os.environ,
+                    {"BN_USER_DIRECTORY": str(user_dir)},
+                ),
             ):
                 self.assertIsNone(find_bn_install_path())
 
@@ -203,9 +240,12 @@ site_packages.joinpath("binaryninja.py").write_text("API_VERSION = 'test'\\n", e
             macos_dir.mkdir(parents=True)
             user_dir.joinpath("lastrun").write_text(str(macos_dir), encoding="utf-8")
 
-            with patch("bnpm.helpers.bn.platform.system", return_value="Darwin"), patch.dict(
-                os.environ,
-                {"BN_USER_DIRECTORY": str(user_dir)},
+            with (
+                patch("bnpm.helpers.bn.platform.system", return_value="Darwin"),
+                patch.dict(
+                    os.environ,
+                    {"BN_USER_DIRECTORY": str(user_dir)},
+                ),
             ):
                 self.assertEqual(find_bn_install_path(), install_root)
 
@@ -217,13 +257,18 @@ site_packages.joinpath("binaryninja.py").write_text("API_VERSION = 'test'\\n", e
             python.write_text("", encoding="utf-8")
             result = Mock(returncode=0, stdout='Python version: "3.10"\n', stderr="")
 
-            with patch("bnpm.helpers.bn.platform.system", return_value="Windows"), patch(
-                "bnpm.helpers.bn.subprocess.run",
-                return_value=result,
-            ) as run:
+            with (
+                patch("bnpm.helpers.bn.platform.system", return_value="Windows"),
+                patch(
+                    "bnpm.helpers.bn.subprocess.run",
+                    return_value=result,
+                ) as run,
+            ):
                 self.assertEqual(get_bn_python_version(root), "3.10")
 
-            self.assertEqual(run.call_args.args[0], [str(python.resolve()), "-m", "sysconfig"])
+            self.assertEqual(
+                run.call_args.args[0], [str(python.resolve()), "-m", "sysconfig"]
+            )
 
     def test_helper_reads_macos_bnpython_version_from_sysconfig(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -233,13 +278,20 @@ site_packages.joinpath("binaryninja.py").write_text("API_VERSION = 'test'\\n", e
             python.write_text("", encoding="utf-8")
             sysconfig = Mock(returncode=0, stdout='Python version: "3.10"\n', stderr="")
 
-            with patch("bnpm.helpers.bn.platform.system", return_value="Darwin"), patch(
-                "bnpm.helpers.bn.subprocess.run",
-                return_value=sysconfig,
-            ) as run:
-                self.assertEqual(get_bn_python_version(root / "Binary Ninja.app"), "3.10")
+            with (
+                patch("bnpm.helpers.bn.platform.system", return_value="Darwin"),
+                patch(
+                    "bnpm.helpers.bn.subprocess.run",
+                    return_value=sysconfig,
+                ) as run,
+            ):
+                self.assertEqual(
+                    get_bn_python_version(root / "Binary Ninja.app"), "3.10"
+                )
 
-            self.assertEqual(run.call_args.args[0], [str(python.resolve()), "-m", "sysconfig"])
+            self.assertEqual(
+                run.call_args.args[0], [str(python.resolve()), "-m", "sysconfig"]
+            )
 
     def test_helper_reads_linux_bnpython_version_from_sysconfig(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -249,13 +301,18 @@ site_packages.joinpath("binaryninja.py").write_text("API_VERSION = 'test'\\n", e
             python.write_text("", encoding="utf-8")
             sysconfig = Mock(returncode=0, stdout='Python version: "3.10"\n', stderr="")
 
-            with patch("bnpm.helpers.bn.platform.system", return_value="Linux"), patch(
-                "bnpm.helpers.bn.subprocess.run",
-                return_value=sysconfig,
-            ) as run:
+            with (
+                patch("bnpm.helpers.bn.platform.system", return_value="Linux"),
+                patch(
+                    "bnpm.helpers.bn.subprocess.run",
+                    return_value=sysconfig,
+                ) as run,
+            ):
                 self.assertEqual(get_bn_python_version(root / "binaryninja"), "3.10")
 
-            self.assertEqual(run.call_args.args[0], [str(python.resolve()), "-m", "sysconfig"])
+            self.assertEqual(
+                run.call_args.args[0], [str(python.resolve()), "-m", "sysconfig"]
+            )
 
     def test_helper_returns_none_when_bn_python_is_missing(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -268,7 +325,9 @@ site_packages.joinpath("binaryninja.py").write_text("API_VERSION = 'test'\\n", e
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp).resolve()
             install_root = root / "Binary Ninja.app"
-            install_api = install_root / "Contents" / "Resources" / "scripts" / "install_api.py"
+            install_api = (
+                install_root / "Contents" / "Resources" / "scripts" / "install_api.py"
+            )
             install_api.parent.mkdir(parents=True)
             install_api.write_text("", encoding="utf-8")
 

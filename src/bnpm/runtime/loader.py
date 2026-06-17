@@ -13,7 +13,9 @@ from .logs import log_error, log_info, log_warning
 
 def resolve_plugin_path(home: Path, plugin: LockedPlugin) -> Path | None:
     try:
-        return resolve_plugin_dir_from_lock(home, plugin.name, plugin.source, plugin.commit)
+        return resolve_plugin_dir_from_lock(
+            home, plugin.name, plugin.source, plugin.commit
+        )
     except ValueError as exc:
         log_warning(f"skipped plugin: {exc}")
         return None
@@ -87,7 +89,9 @@ def resolve_plugin_entry(name: str, plugin_path: Path) -> tuple[Path, Path] | No
 
 def resolve_plugin_path_or_raise(home: Path, plugin: LockedPlugin) -> Path:
     try:
-        return resolve_plugin_dir_from_lock(home, plugin.name, plugin.source, plugin.commit)
+        return resolve_plugin_dir_from_lock(
+            home, plugin.name, plugin.source, plugin.commit
+        )
     except ValueError as exc:
         from ..errors import BnpmError
 
@@ -104,7 +108,3 @@ def _read_install_metadata(name: str, plugin_path: Path) -> InstalledPlugin | No
 
 def _sanitize_name(name: str) -> str:
     return "".join(char if char.isalnum() else "_" for char in name)
-
-
-
-

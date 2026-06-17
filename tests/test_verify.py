@@ -16,6 +16,7 @@ from bnpm.utils.locations import (
 )
 from tests.helpers import clear_bnpm_caches
 
+
 class VerifyTests(unittest.TestCase):
     def setUp(self):
         clear_bnpm_caches()
@@ -41,7 +42,10 @@ class VerifyTests(unittest.TestCase):
             write_lockfile(lock, [locked])
 
             stderr = io.StringIO()
-            with patch_verify_config(root / "bnpm.lock", home), contextlib.redirect_stderr(stderr):
+            with (
+                patch_verify_config(root / "bnpm.lock", home),
+                contextlib.redirect_stderr(stderr),
+            ):
                 code = run_cli(["verify"])
 
             self.assertEqual(code, 1)
@@ -66,7 +70,10 @@ class VerifyTests(unittest.TestCase):
             write_lockfile(lock, [locked])
 
             stdout = io.StringIO()
-            with patch_verify_config(root / "bnpm.lock", home), contextlib.redirect_stdout(stdout):
+            with (
+                patch_verify_config(root / "bnpm.lock", home),
+                contextlib.redirect_stdout(stdout),
+            ):
                 code = run_cli(["verify"])
 
             self.assertEqual(code, 0)
@@ -91,7 +98,10 @@ class VerifyTests(unittest.TestCase):
             )
 
             stderr = io.StringIO()
-            with patch_verify_config(root / "bnpm.lock", home), contextlib.redirect_stderr(stderr):
+            with (
+                patch_verify_config(root / "bnpm.lock", home),
+                contextlib.redirect_stderr(stderr),
+            ):
                 code = run_cli(["verify"])
 
             self.assertEqual(code, 1)
@@ -108,8 +118,3 @@ def patch_verify_config(lock_path: Path, home: Path):
             bnpm_plugin_dir=home,
         ),
     )
-
-
-
-
-

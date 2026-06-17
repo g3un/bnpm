@@ -39,7 +39,9 @@ class UpdateCommand(Command):
 
         installed = [
             install(
-                resolve_manifest_path_spec(manifest.plugins[name], manifest.path.parent),
+                resolve_manifest_path_spec(
+                    manifest.plugins[name], manifest.path.parent
+                ),
                 home,
                 report_progress=report_progress,
             )
@@ -47,13 +49,13 @@ class UpdateCommand(Command):
         ]
         lockfile = load_lockfile(lock_path)
         plugins = merge_plugins(lockfile.plugins, installed)
-        packages = install_packages(collect_requirements(plugins), home, report_progress=report_progress)
+        packages = install_packages(
+            collect_requirements(plugins), home, report_progress=report_progress
+        )
         locked_plugins, locked_packages = lock_dependencies(plugins, packages)
         write_lockfile(lock_path, locked_plugins, locked_packages)
         for plugin in installed:
-            print(f"updated {plugin.name} {plugin.version or 'local'} {plugin.commit or plugin.source}")
+            print(
+                f"updated {plugin.name} {plugin.version or 'local'} {plugin.commit or plugin.source}"
+            )
         return 0
-
-
-
-

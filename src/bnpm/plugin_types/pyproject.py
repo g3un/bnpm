@@ -22,7 +22,9 @@ def read_project_dependencies(path: Path) -> list[str]:
     dependencies = project.get("dependencies", [])
     if dependencies is None:
         return []
-    if not isinstance(dependencies, list) or not all(isinstance(item, str) for item in dependencies):
+    if not isinstance(dependencies, list) or not all(
+        isinstance(item, str) for item in dependencies
+    ):
         raise FetchError("[project].dependencies must be a list of strings")
     return dependencies
 
@@ -56,7 +58,9 @@ def _load_pyproject(path: Path, warn: Warn) -> dict[str, Any] | None:
         return None
 
 
-def _resolve_tool_bnpm_entry(name: str, plugin_path: Path, pyproject: dict[str, Any], warn: Warn) -> tuple[Path, Path] | None:
+def _resolve_tool_bnpm_entry(
+    name: str, plugin_path: Path, pyproject: dict[str, Any], warn: Warn
+) -> tuple[Path, Path] | None:
     tool = pyproject.get("tool", {})
     if not isinstance(tool, dict):
         return None
@@ -107,4 +111,3 @@ def _is_relative_to(path: Path, parent: Path) -> bool:
         return True
     except ValueError:
         return False
-

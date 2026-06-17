@@ -7,7 +7,11 @@ from ..lockfile import load_lockfile
 from ..utils.locations import resolve_package_dir
 from .loader import load_plugin, resolve_plugin_path, verify_install
 from .logs import log_info
-from .python import build_plugin_python_env, resolve_plugin_python_executable, spawn_plugin_python
+from .python import (
+    build_plugin_python_env,
+    resolve_plugin_python_executable,
+    spawn_plugin_python,
+)
 from .sync import sync_stale_manifest_if_needed
 
 
@@ -51,7 +55,3 @@ __all__ = [
     "resolve_plugin_python_executable",
     "spawn_plugin_python",
 ]
-
-
-
-

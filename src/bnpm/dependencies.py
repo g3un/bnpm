@@ -15,7 +15,11 @@ def lock_dependencies(
 ) -> tuple[list[LockedPlugin], list[LockedPackage]]:
     pins = {_normalize_name(package.name): _format_pin(package) for package in packages}
     locked_plugins = [
-        replace(plugin, dependencies=_resolve_pins(plugin.requirements or [], pins), requirements=None)
+        replace(
+            plugin,
+            dependencies=_resolve_pins(plugin.requirements or [], pins),
+            requirements=None,
+        )
         for plugin in plugins
     ]
     locked_packages = [
@@ -51,5 +55,3 @@ def _normalize_name(name: str) -> str:
 def _format_pin(package: LockedPackage) -> str:
     version = package.version.removeprefix("pypi:")
     return f"{package.name}=={version}"
-
-

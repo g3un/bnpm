@@ -61,6 +61,3 @@ def _build_manifest_plugin(name: str, spec: SourceSpec) -> ManifestPlugin:
 
     assert spec.git is not None
     return ManifestPlugin(name=name, source=spec.git, version=spec.version)
-
-
-

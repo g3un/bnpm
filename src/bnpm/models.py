@@ -124,4 +124,3 @@ class VerificationResult:
     actual: str | None
     ok: bool
     message: str
-

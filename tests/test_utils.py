@@ -20,6 +20,7 @@ from bnpm.utils.locations import (
 )
 from tests.helpers import clear_bnpm_caches
 
+
 class UtilsTests(unittest.TestCase):
     def setUp(self):
         clear_bnpm_caches()
@@ -29,18 +30,28 @@ class UtilsTests(unittest.TestCase):
             root = Path(temp).resolve()
             appdata = root / "roaming"
             localappdata = root / "local"
-            with patch("bnpm.config.platform.system", return_value="Windows"), patch.dict(
-                os.environ,
-                {
-                    "APPDATA": str(appdata),
-                    "LOCALAPPDATA": str(localappdata),
-                },
+            with (
+                patch("bnpm.config.platform.system", return_value="Windows"),
+                patch.dict(
+                    os.environ,
+                    {
+                        "APPDATA": str(appdata),
+                        "LOCALAPPDATA": str(localappdata),
+                    },
+                ),
             ):
                 config = get_config()
                 self.assertEqual(config.bnpm_config_dir, appdata / "bnpm")
-                self.assertEqual(config.bnpm_manifest_path, appdata / "bnpm" / "bnpm.toml")
-                self.assertEqual(config.bnpm_plugin_dir, localappdata / "bnpm" / "plugins")
-                self.assertEqual(resolve_package_dir(config.bnpm_plugin_dir), localappdata / "bnpm" / "packages")
+                self.assertEqual(
+                    config.bnpm_manifest_path, appdata / "bnpm" / "bnpm.toml"
+                )
+                self.assertEqual(
+                    config.bnpm_plugin_dir, localappdata / "bnpm" / "plugins"
+                )
+                self.assertEqual(
+                    resolve_package_dir(config.bnpm_plugin_dir),
+                    localappdata / "bnpm" / "packages",
+                )
                 self.assertEqual(config.bnpm_venv_dir, localappdata / "bnpm" / "venv")
 
     def test_file_uri_round_trip(self):
@@ -133,8 +144,3 @@ class UtilsTests(unittest.TestCase):
             )
 
             self.assertEqual(compute_tree_sha256(root), before)
-
-
-
-
-

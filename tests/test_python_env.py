@@ -30,7 +30,9 @@ class PythonEnvTests(unittest.TestCase):
                 "bnpm.utils.python_env.get_config",
                 return_value=types.SimpleNamespace(bnpm_venv_python=python.resolve()),
             ):
-                self.assertEqual(resolve_package_python_executable(), str(python.resolve()))
+                self.assertEqual(
+                    resolve_package_python_executable(), str(python.resolve())
+                )
 
     def test_python_executable_reports_missing_bnpm_venv(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -40,13 +42,21 @@ class PythonEnvTests(unittest.TestCase):
                 "bnpm.utils.python_env.get_config",
                 return_value=types.SimpleNamespace(bnpm_venv_python=python),
             ):
-                with self.assertRaisesRegex(Exception, "BNPM Python environment is missing"):
+                with self.assertRaisesRegex(
+                    Exception, "BNPM Python environment is missing"
+                ):
                     resolve_package_python_executable()
 
     def test_uv_target_options_uses_bn_python_major_minor(self):
-        with patch("bnpm.utils.python_env.find_bn_install_path", return_value=Path("BinaryNinja")), patch(
-            "bnpm.utils.python_env.get_bn_python_version",
-            return_value="3.12.4",
+        with (
+            patch(
+                "bnpm.utils.python_env.find_bn_install_path",
+                return_value=Path("BinaryNinja"),
+            ),
+            patch(
+                "bnpm.utils.python_env.get_bn_python_version",
+                return_value="3.12.4",
+            ),
         ):
             self.assertEqual(resolve_bn_python_version(), "3.12.4")
             self.assertEqual(resolve_bn_python_major_minor(), "3.12")
@@ -55,4 +65,3 @@ class PythonEnvTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

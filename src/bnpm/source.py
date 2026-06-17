@@ -32,7 +32,14 @@ def _parse_table(name: str, value: dict[str, object]) -> SourceSpec:
         return SourceSpec(name=name, kind="path", path=path)
 
     git = _read_required_str(name, value, "git")
-    return SourceSpec(name=name, kind="git", git=_normalize_git_url(git), tag=tag, branch=branch, rev=rev)
+    return SourceSpec(
+        name=name,
+        kind="git",
+        git=_normalize_git_url(git),
+        tag=tag,
+        branch=branch,
+        rev=rev,
+    )
 
 
 def _parse_git_source(name: str, source: str) -> SourceSpec:
@@ -65,7 +72,9 @@ def _normalize_git_url(value: str) -> str:
 
 def _reject_url_extra(source: str, parsed: ParseResult) -> None:
     if parsed.query:
-        raise SourceError(f"query strings are not supported in plugin source {source!r}")
+        raise SourceError(
+            f"query strings are not supported in plugin source {source!r}"
+        )
     if parsed.fragment:
         raise SourceError(f"fragments are not supported in plugin source {source!r}")
 
@@ -86,4 +95,3 @@ def _read_optional_str(name: str, table: dict[str, object], key: str) -> str | N
     if key not in table:
         return None
     return _read_required_str(name, table, key)
-

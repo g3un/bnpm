@@ -18,3 +18,9 @@ bnpm = "bnpm.cli:run_cli"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/bnpm"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.0",
+    "ruff>=0.15.17",
+]

@@ -50,4 +50,3 @@ def _resolve_default_bn_user_dir() -> Path:
             return Path(base) / "Binary Ninja"
         raise BnpmError("APPDATA is not set")
     return Path.home() / ".binaryninja"
-

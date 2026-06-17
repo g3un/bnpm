@@ -4,6 +4,7 @@ import unittest
 
 from bnpm.source import parse_plugin
 
+
 class SourceTests(unittest.TestCase):
     def test_github_shorthand(self):
         spec = parse_plugin("hexpatch", "github.com/user/hexpatch")
@@ -25,7 +26,11 @@ class SourceTests(unittest.TestCase):
         with self.assertRaisesRegex(Exception, "can only set one of tag, branch, rev"):
             parse_plugin(
                 "hexpatch",
-                {"git": "https://github.com/user/hexpatch.git", "tag": "v1.0.0", "branch": "main"},
+                {
+                    "git": "https://github.com/user/hexpatch.git",
+                    "tag": "v1.0.0",
+                    "branch": "main",
+                },
             )
 
     def test_table_cannot_set_git_and_path(self):
@@ -53,5 +58,3 @@ class SourceTests(unittest.TestCase):
 
         self.assertEqual(spec.git, "git@github.com:user/hexpatch.git")
         self.assertEqual(spec.version, "HEAD")
-
-

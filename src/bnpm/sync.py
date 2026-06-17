@@ -21,14 +21,20 @@ def sync(
     config = get_config()
     manifest_path = manifest_path or config.bnpm_manifest_path
     lock_path = lock_path or config.bnpm_lock_path
-    home = home or config.bnpm_plugin_dir
+    home = (home or config.bnpm_plugin_dir).expanduser().resolve()
 
     manifest = load_manifest(manifest_path)
     installed = [
-        install(resolve_manifest_path_spec(spec, manifest.path.parent), home, report_progress=report_progress)
+        install(
+            resolve_manifest_path_spec(spec, manifest.path.parent),
+            home,
+            report_progress=report_progress,
+        )
         for spec in manifest.plugins.values()
     ]
-    packages = install_packages(_collect_requirements(installed), home, report_progress=report_progress)
+    packages = install_packages(
+        _collect_requirements(installed), home, report_progress=report_progress
+    )
     locked_plugins, locked_packages = lock_dependencies(installed, packages)
     write_lockfile(lock_path, locked_plugins, locked_packages)
     return locked_plugins
@@ -46,9 +52,9 @@ def resolve_manifest_path_spec(spec: SourceSpec, base: Path) -> SourceSpec:
 def _collect_requirements(plugins: list[LockedPlugin]) -> list[str]:
     requirements = []
     for plugin in plugins:
-        requirements.extend(plugin.requirements if plugin.requirements is not None else plugin.dependencies or [])
+        requirements.extend(
+            plugin.requirements
+            if plugin.requirements is not None
+            else plugin.dependencies or []
+        )
     return requirements
-
-
-
-

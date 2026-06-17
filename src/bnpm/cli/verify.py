@@ -14,7 +14,9 @@ class VerifyCommand(Command):
     @classmethod
     def run(cls, args: Namespace) -> int:
         config = get_config()
-        results = verify_plugins(lock_path=config.bnpm_lock_path, home=config.bnpm_plugin_dir)
+        results = verify_plugins(
+            lock_path=config.bnpm_lock_path, home=config.bnpm_plugin_dir
+        )
         failed = False
         for result in results:
             if result.ok:

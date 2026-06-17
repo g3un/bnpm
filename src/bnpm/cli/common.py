@@ -17,7 +17,11 @@ def report_progress(message: str) -> None:
 def collect_requirements(plugins: list[LockedPlugin]) -> list[str]:
     result = []
     for plugin in plugins:
-        result.extend(plugin.requirements if plugin.requirements is not None else plugin.dependencies or [])
+        result.extend(
+            plugin.requirements
+            if plugin.requirements is not None
+            else plugin.dependencies or []
+        )
     return result
 
 
@@ -41,9 +45,3 @@ def ensure_clean_manifest_lock(manifest_path: Path, lock_path: Path) -> None:
         "bnpm.toml and bnpm.lock differ. Run `bnpm sync` before changing plugins.\n"
         + details
     )
-
-
-
-
-
-

@@ -20,7 +20,9 @@ class FetchTests(unittest.TestCase):
                 if args[:3] == ["git", "clone", "--quiet"]:
                     checkout = Path(args[-1])
                     checkout.mkdir()
-                    checkout.joinpath("__init__.py").write_text("VALUE = 1\n", encoding="utf-8")
+                    checkout.joinpath("__init__.py").write_text(
+                        "VALUE = 1\n", encoding="utf-8"
+                    )
                     return ""
                 if args[:3] == ["git", "rev-parse", "HEAD"]:
                     return "abc123"
@@ -28,7 +30,11 @@ class FetchTests(unittest.TestCase):
 
             with patch("bnpm.fetch._run_git", side_effect=fake_run_git):
                 locked = install(
-                    SourceSpec(name="stable", kind="git", git="https://github.com/user/stable.git"),
+                    SourceSpec(
+                        name="stable",
+                        kind="git",
+                        git="https://github.com/user/stable.git",
+                    ),
                     home,
                 )
 
@@ -51,29 +57,43 @@ class FetchTests(unittest.TestCase):
             home = root / "home"
             target = home / "stable"
             target.mkdir(parents=True)
-            target.joinpath("__init__.py").write_text("VALUE = 'old'\n", encoding="utf-8")
+            target.joinpath("__init__.py").write_text(
+                "VALUE = 'old'\n", encoding="utf-8"
+            )
 
             def fake_run_git(args, cwd):
                 if args[:3] == ["git", "clone", "--quiet"]:
                     checkout = Path(args[-1])
                     checkout.mkdir()
-                    checkout.joinpath("__init__.py").write_text("VALUE = 'new'\n", encoding="utf-8")
+                    checkout.joinpath("__init__.py").write_text(
+                        "VALUE = 'new'\n", encoding="utf-8"
+                    )
                     return ""
                 if args[:3] == ["git", "rev-parse", "HEAD"]:
                     return "abc123"
                 return ""
 
-            with patch("bnpm.fetch._run_git", side_effect=fake_run_git), patch(
-                "bnpm.fetch.Path.rename",
-                side_effect=OSError("replace failed"),
+            with (
+                patch("bnpm.fetch._run_git", side_effect=fake_run_git),
+                patch(
+                    "bnpm.fetch.Path.rename",
+                    side_effect=OSError("replace failed"),
+                ),
             ):
                 with self.assertRaisesRegex(OSError, "replace failed"):
                     install(
-                        SourceSpec(name="stable", kind="git", git="https://github.com/user/stable.git"),
+                        SourceSpec(
+                            name="stable",
+                            kind="git",
+                            git="https://github.com/user/stable.git",
+                        ),
                         home,
                     )
 
-            self.assertEqual(target.joinpath("__init__.py").read_text(encoding="utf-8"), "VALUE = 'old'\n")
+            self.assertEqual(
+                target.joinpath("__init__.py").read_text(encoding="utf-8"),
+                "VALUE = 'old'\n",
+            )
             self.assertEqual(list(home.glob(".*.tmp")), [])
 
 

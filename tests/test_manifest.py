@@ -7,6 +7,7 @@ import unittest
 from bnpm.manifest import load_manifest
 from bnpm.utils.toml import _parse_subset
 
+
 class ManifestTests(unittest.TestCase):
     def test_load_manifest(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -73,5 +74,3 @@ source = "src"
         self.assertEqual(data["project"]["dependencies"], ["requests>=2.31,<3"])
         self.assertEqual(data["tool"]["bnpm"]["package"], "actual_package")
         self.assertEqual(data["tool"]["bnpm"]["source"], "src")
-
-

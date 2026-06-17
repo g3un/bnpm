@@ -23,6 +23,7 @@ from bnpm.utils.locations import (
 from bnpm.config import get_config
 from tests.helpers import clear_bnpm_caches
 
+
 class RuntimeTests(unittest.TestCase):
     def setUp(self):
         clear_bnpm_caches()
@@ -52,7 +53,9 @@ pyproject_src = { path = "plugin" }
                 encoding="utf-8",
             )
 
-            sync(manifest_path=manifest, lock_path=root / "bnpm.lock", home=root / "home")
+            sync(
+                manifest_path=manifest, lock_path=root / "bnpm.lock", home=root / "home"
+            )
             lockfile = load_lockfile(root / "bnpm.lock")
             self.assertEqual(lockfile.plugins[0].source, plugin.resolve().as_uri())
             self.assertIsNone(lockfile.plugins[0].version)
@@ -93,7 +96,9 @@ local = { path = "plugin" }
                 encoding="utf-8",
             )
 
-            sync(manifest_path=manifest, lock_path=root / "bnpm.lock", home=root / "home")
+            sync(
+                manifest_path=manifest, lock_path=root / "bnpm.lock", home=root / "home"
+            )
 
             activate(lock_path=root / "bnpm.lock", home=root / "home")
 
@@ -134,7 +139,9 @@ tool_bnpm = { path = "plugin" }
                 encoding="utf-8",
             )
 
-            sync(manifest_path=manifest, lock_path=root / "bnpm.lock", home=root / "home")
+            sync(
+                manifest_path=manifest, lock_path=root / "bnpm.lock", home=root / "home"
+            )
 
             activate(lock_path=root / "bnpm.lock", home=root / "home")
 
@@ -148,7 +155,9 @@ tool_bnpm = { path = "plugin" }
             packages.mkdir(parents=True)
             extra = packages / "extra"
             extra.mkdir()
-            extra.joinpath("pth_dependency.py").write_text("VALUE = 'ok'\n", encoding="utf-8")
+            extra.joinpath("pth_dependency.py").write_text(
+                "VALUE = 'ok'\n", encoding="utf-8"
+            )
             packages.joinpath("dependency.pth").write_text("extra\n", encoding="utf-8")
             plugin = root / "plugin"
             plugin.mkdir()
@@ -212,7 +221,9 @@ dependencies = []
 
             pythonpath = env["PYTHONPATH"].split(os.pathsep)
             self.assertEqual(Path(pythonpath[0]).resolve(), (plugin / "src").resolve())
-            self.assertEqual(Path(pythonpath[1]).resolve(), resolve_package_dir(home).resolve())
+            self.assertEqual(
+                Path(pythonpath[1]).resolve(), resolve_package_dir(home).resolve()
+            )
             self.assertEqual(pythonpath[-1], "existing")
             self.assertEqual(env["VIRTUAL_ENV"], str(get_config().bnpm_venv_dir))
 
@@ -222,8 +233,12 @@ dependencies = []
             lock = root / "bnpm.lock"
             write_lockfile(lock, [])
 
-            with self.assertRaisesRegex(Exception, "missing: plugin is not in bnpm.lock"):
-                build_plugin_python_env("missing", lock_path=lock, home=root / "home", env={})
+            with self.assertRaisesRegex(
+                Exception, "missing: plugin is not in bnpm.lock"
+            ):
+                build_plugin_python_env(
+                    "missing", lock_path=lock, home=root / "home", env={}
+                )
 
     def test_plugin_python_env_reports_missing_entry_point(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -403,7 +418,13 @@ dependencies = []
             binaryninja.PluginCommand = type(
                 "PluginCommand",
                 (),
-                {"register": staticmethod(lambda *args, **kwargs: registered_commands.append((args, kwargs)))},
+                {
+                    "register": staticmethod(
+                        lambda *args, **kwargs: registered_commands.append(
+                            (args, kwargs)
+                        )
+                    )
+                },
             )
             binaryninja.log_error = lambda *args, **kwargs: None
             binaryninja.log_info = lambda *args, **kwargs: None
@@ -440,13 +461,14 @@ dependencies = []
                     with self.assertRaises(ModuleNotFoundError):
                         __import__("bnpm.cli")
             finally:
-                for name in [name for name in sys.modules if name == "bnpm" or name.startswith("bnpm.")]:
+                for name in [
+                    name
+                    for name in sys.modules
+                    if name == "bnpm" or name.startswith("bnpm.")
+                ]:
                     sys.modules.pop(name, None)
                 sys.modules.update(saved_modules)
 
 
 if __name__ == "__main__":
     unittest.main()
-
-
-

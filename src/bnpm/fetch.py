@@ -35,7 +35,9 @@ def _lock_path_spec(spec: SourceSpec, home: Path, report_progress=None) -> Locke
     )
 
 
-def _install_git_spec(spec: SourceSpec, home: Path, report_progress=None) -> LockedPlugin:
+def _install_git_spec(
+    spec: SourceSpec, home: Path, report_progress=None
+) -> LockedPlugin:
     if not spec.git:
         raise FetchError(f"{spec.name}: git source is missing URL")
 
@@ -106,7 +108,10 @@ def _read_requirements(plugin_path: Path, report_progress=None) -> list[str]:
     requirements_path = plugin_path / "requirements.txt"
     if pyproject_path.exists():
         if requirements_path.exists():
-            _report_progress(report_progress, f"ignored {requirements_path}: pyproject.toml is present")
+            _report_progress(
+                report_progress,
+                f"ignored {requirements_path}: pyproject.toml is present",
+            )
         return pyproject.read_project_dependencies(pyproject_path)
 
     if not requirements_path.exists():
@@ -118,10 +123,3 @@ def _read_requirements(plugin_path: Path, report_progress=None) -> list[str]:
 def _report_progress(report_progress, message: str) -> None:
     if report_progress is not None:
         report_progress(message)
-
-
-
-
-
-
-

@@ -22,7 +22,9 @@ def resolve_install_dir(home: Path, spec: SourceSpec) -> Path:
     return resolve_plugin_dir(home, spec.name)
 
 
-def resolve_plugin_dir_from_lock(home: Path, name: str, source: str, commit: str | None) -> Path:
+def resolve_plugin_dir_from_lock(
+    home: Path, name: str, source: str, commit: str | None
+) -> Path:
     if commit is None:
         if source.startswith("file://"):
             return convert_file_uri_to_path(source)
@@ -55,4 +57,3 @@ def _encode_path_segment(value: str) -> str:
     if not value:
         raise ValueError("empty plugin path segment")
     return quote(value, safe="")
-

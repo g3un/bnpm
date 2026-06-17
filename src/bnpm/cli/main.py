@@ -15,5 +15,3 @@ def run_cli(argv: list[str] | None = None) -> int:
     except BnpmError as exc:
         print(f"bnpm: {exc}", file=sys.stderr)
         return 1
-
-

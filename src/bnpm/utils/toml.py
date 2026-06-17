@@ -138,7 +138,9 @@ def _parse_string(value: str) -> str:
     return "".join(result)
 
 
-def _resolve_table_parent(data: dict[str, Any], name: str) -> tuple[dict[str, Any], str]:
+def _resolve_table_parent(
+    data: dict[str, Any], name: str
+) -> tuple[dict[str, Any], str]:
     parts = [part.strip() for part in name.split(".")]
     if not parts or any(not part for part in parts):
         raise ValueError(f"invalid TOML table name: {name}")
@@ -189,4 +191,3 @@ def _strip_comment(line: str) -> str:
         if char == "#" and not in_string:
             return line[:index]
     return line
-

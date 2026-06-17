@@ -72,5 +72,3 @@ def _remove_empty_parents(path: Path, stop: Path) -> None:
         except OSError:
             return
         path = path.parent
-
-

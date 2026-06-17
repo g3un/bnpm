@@ -24,7 +24,9 @@ def load_lockfile(path: Path) -> Lockfile:
                 checksum=item["checksum"],
                 version=item.get("version"),
                 commit=item.get("commit"),
-                dependencies=_parse_string_list(item.get("dependencies", []), "plugins.dependencies"),
+                dependencies=_parse_string_list(
+                    item.get("dependencies", []), "plugins.dependencies"
+                ),
             )
         )
 
@@ -36,7 +38,9 @@ def load_lockfile(path: Path) -> Lockfile:
                 source=item["source"],
                 version=item["version"],
                 checksum=item.get("checksum"),
-                dependencies=_parse_string_list(item.get("dependencies", []), "packages.dependencies"),
+                dependencies=_parse_string_list(
+                    item.get("dependencies", []), "packages.dependencies"
+                ),
             )
         )
     return Lockfile(path=path, plugins=plugins, packages=packages)
@@ -47,7 +51,9 @@ def write_lockfile(
     plugins: list[LockedPlugin],
     packages: list[LockedPackage] | None = None,
 ) -> None:
-    write_text_atomically(path, _format_lockfile(plugins, packages or []), allow_direct_fallback=True)
+    write_text_atomically(
+        path, _format_lockfile(plugins, packages or []), allow_direct_fallback=True
+    )
 
 
 def _format_lockfile(plugins: list[LockedPlugin], packages: list[LockedPackage]) -> str:
@@ -79,12 +85,16 @@ def _format_lockfile(plugins: list[LockedPlugin], packages: list[LockedPackage])
         )
         if package.checksum is not None:
             lines.append(f'checksum = "{_escape(package.checksum)}"')
-        lines.extend(_format_string_list("dependencies", sorted(package.dependencies or [])))
+        lines.extend(
+            _format_string_list("dependencies", sorted(package.dependencies or []))
+        )
         lines.append("")
     return "\n".join(lines)
 
 
-def merge_plugins(existing: list[LockedPlugin], updates: list[LockedPlugin]) -> list[LockedPlugin]:
+def merge_plugins(
+    existing: list[LockedPlugin], updates: list[LockedPlugin]
+) -> list[LockedPlugin]:
     merged = {plugin.name: plugin for plugin in existing}
     for plugin in updates:
         merged[plugin.name] = plugin
@@ -108,4 +118,3 @@ def _parse_string_list(value: object, field: str) -> list[str]:
 
 def _escape(value: str) -> str:
     return value.replace("\\", "\\\\").replace('"', '\\"')
-

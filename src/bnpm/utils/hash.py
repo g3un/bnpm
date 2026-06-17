@@ -23,4 +23,3 @@ def compute_tree_sha256(path: Path) -> str:
         digest.update(item.read_bytes())
         digest.update(b"\0")
     return "sha256:" + digest.hexdigest()
-

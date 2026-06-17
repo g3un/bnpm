@@ -24,7 +24,9 @@ DEFAULT_COMMANDS: tuple[type[Command], ...] = (
 )
 
 
-def build_parser(commands: Sequence[type[Command]] = DEFAULT_COMMANDS) -> argparse.ArgumentParser:
+def build_parser(
+    commands: Sequence[type[Command]] = DEFAULT_COMMANDS,
+) -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="bnpm")
 
     subparsers = parser.add_subparsers(dest="command", required=True)
