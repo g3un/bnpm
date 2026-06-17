@@ -1,0 +1,51 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  release:
+    runs-on: codeberg-small
+    container:
+      image: ghcr.io/astral-sh/uv:python3.10-alpine
+    defaults:
+      run:
+        shell: sh
+
+    steps:
+      - name: Install CI prerequisites
+        run: apk add --no-cache git nodejs
+
+      - name: Check out repository
+        uses: https://data.forgejo.org/actions/checkout@v4
+
+      - name: Install dependencies
+        run: uv sync --frozen --all-groups
+
+      - name: Check release tag
+        run: uv run python scripts/create_forgejo_release.py --check-tag
+
+      - name: Check formatting
+        run: uv run ruff format --check .
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Test
+        run: uv run pytest
+
+      - name: Build package
+        run: uv build
+
+      - name: Publish package to PyPI
+        run: uv publish
+        env:
+          UV_PUBLISH_TOKEN: ${{ secrets.PYPI_TOKEN }}
+
+      - name: Create Forgejo release
+        run: uv run python scripts/create_forgejo_release.py
+        env:
+          FORGEJO_TOKEN: ${{ secrets.FORGEJO_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
