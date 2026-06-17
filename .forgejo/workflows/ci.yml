@@ -10,7 +10,7 @@ jobs:
   checks:
     runs-on: codeberg-tiny
     container:
-      image: astral/uv:python3.10-alpine
+      image: ghcr.io/astral-sh/uv:python3.10-alpine
 
     steps:
       - name: Install CI prerequisites
