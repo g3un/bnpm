@@ -3,19 +3,32 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
+from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from urllib.error import HTTPError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
 
-try:
-    import tomllib
-except ModuleNotFoundError:  # pragma: no cover - Python 3.10 fallback
-    import tomli as tomllib
+ROOT = Path(__file__).resolve().parents[1]
+VERSION_PATTERN = re.compile(
+    r"^(?P<major>0|[1-9]\d*)\.(?P<date>\d{8})\.(?P<patch>0|[1-9]\d*)$"
+)
 
 
-ROOT = Path(__file__).resolve().parent.parent
+@dataclass(frozen=True)
+class Response:
+    status: int
+    reason: str
+    body: bytes
+
+    def text(self) -> str:
+        return self.body.decode("utf-8", errors="replace")
+
+    def json(self) -> dict:
+        return json.loads(self.text())
 
 
 def main() -> None:
@@ -23,47 +36,38 @@ def main() -> None:
     if sys.argv[1:] and not check_only:
         fail("usage: create_forgejo_release.py [--check-tag]")
 
-    project = read_project_metadata()
+    project = read_project(ROOT / "pyproject.toml")
     package_name = project["name"]
     version = project["version"]
-    prerelease = "-" in version
-    tag_name = resolve_tag_name()
+    validate_version(version)
 
-    if not tag_name:
-        fail("GITHUB_REF_NAME, FORGEJO_REF_NAME, or a tag ref is required.")
-    if tag_name != f"v{version}":
-        fail(f"Tag must match project version. Tag: {tag_name}; expected: v{version}")
+    tag_name = require_env("FORGEJO_REF_NAME")
+    expected_tag_name = f"v{version}"
+    if tag_name != expected_tag_name:
+        fail(
+            f"Tag must match pyproject.toml version. Tag: {tag_name}; "
+            f"expected: {expected_tag_name}"
+        )
     if check_only:
-        print(f"Release tag matches project version: {tag_name}")
+        print(f"Release tag matches pyproject.toml version: {tag_name}")
         return
 
-    server_url = trim_trailing_slash(
-        os.environ.get("FORGEJO_SERVER_URL")
-        or os.environ.get("GITHUB_SERVER_URL")
-        or "https://codeberg.org"
-    )
-    repository = os.environ.get("FORGEJO_REPOSITORY") or os.environ.get(
-        "GITHUB_REPOSITORY"
-    )
-    token = os.environ.get("FORGEJO_TOKEN") or os.environ.get("GITHUB_TOKEN")
-
-    if not repository:
-        fail("FORGEJO_REPOSITORY or GITHUB_REPOSITORY is required.")
-    if not token:
-        fail("FORGEJO_TOKEN or GITHUB_TOKEN is required.")
+    server_url = trim_trailing_slash(require_env("FORGEJO_SERVER_URL"))
+    repository = require_env("FORGEJO_REPOSITORY")
+    token = require_env("FORGEJO_TOKEN")
 
     encoded_repository = "/".join(
         quote(part, safe="") for part in repository.split("/")
     )
+    encoded_tag = quote(tag_name, safe="")
     release_by_tag_url = (
-        f"{server_url}/api/v1/repos/{encoded_repository}/releases/tags/"
-        f"{quote(tag_name, safe='')}"
+        f"{server_url}/api/v1/repos/{encoded_repository}/releases/tags/{encoded_tag}"
     )
     releases_url = f"{server_url}/api/v1/repos/{encoded_repository}/releases"
 
     existing_release = request(release_by_tag_url, token, method="GET")
     if existing_release.status == 200:
-        release = json.loads(existing_release.body)
+        release = existing_release.json()
         print(f"Forgejo release already exists: {release.get('html_url') or tag_name}")
         return
     if existing_release.status != 404:
@@ -73,80 +77,97 @@ def main() -> None:
         releases_url,
         token,
         method="POST",
-        body={
-            "tag_name": tag_name,
-            "name": tag_name,
-            "body": f"Published {package_name}@{version} to PyPI.",
-            "draft": False,
-            "prerelease": prerelease,
-        },
+        headers={"Content-Type": "application/json"},
+        body=json.dumps(
+            {
+                "tag_name": tag_name,
+                "name": tag_name,
+                "body": f"Source release for {package_name}@{version}.",
+                "draft": False,
+                "prerelease": False,
+            }
+        ).encode(),
     )
     if create_release.status == 201:
-        release = json.loads(create_release.body)
+        release = create_release.json()
         print(f"Created Forgejo release: {release.get('html_url') or tag_name}")
         return
     if create_release.status == 409:
         print(f"Forgejo release already exists for {tag_name}.")
         return
+
     fail_response("Failed to create Forgejo release", create_release)
 
 
-def read_project_metadata() -> dict[str, str]:
-    with (ROOT / "pyproject.toml").open("rb") as file:
-        data = tomllib.load(file)
-    project = data.get("project")
-    if not isinstance(project, dict):
-        fail("pyproject.toml must contain a [project] table.")
-    name = project.get("name")
-    version = project.get("version")
-    if not isinstance(name, str) or not isinstance(version, str):
-        fail("pyproject.toml [project] must contain name and version strings.")
-    return {"name": name, "version": version}
-
-
-class Response:
-    def __init__(self, status: int, reason: str, body: str) -> None:
-        self.status = status
-        self.reason = reason
-        self.body = body
-
-
-def request(url: str, token: str, *, method: str, body: dict | None = None) -> Response:
-    payload = None if body is None else json.dumps(body).encode("utf-8")
-    headers = {
-        "Accept": "application/json",
-        "Authorization": f"token {token}",
-    }
-    if payload is not None:
-        headers["Content-Type"] = "application/json"
-    forgejo_request = Request(url, data=payload, headers=headers, method=method)
-    try:
-        with urlopen(forgejo_request) as response:
-            return Response(
-                response.status,
-                response.reason,
-                response.read().decode("utf-8", errors="replace"),
-            )
-    except HTTPError as error:
-        return Response(
-            error.code,
-            error.reason,
-            error.read().decode("utf-8", errors="replace"),
+def validate_version(version: str) -> None:
+    match = VERSION_PATTERN.fullmatch(version)
+    if not match:
+        fail(
+            "pyproject.toml version must use {major}.YYYYMMDD.{patch} "
+            f"with release tag v{{major}}.YYYYMMDD.{{patch}}; got: {version}"
         )
+    date = match.group("date")
+    try:
+        datetime.strptime(date, "%Y%m%d")
+    except ValueError:
+        fail(f"pyproject.toml version date must be a valid YYYYMMDD date; got: {date}")
 
 
-def resolve_tag_name() -> str | None:
-    return (
-        os.environ.get("GITHUB_REF_NAME")
-        or os.environ.get("FORGEJO_REF_NAME")
-        or parse_tag_name(os.environ.get("GITHUB_REF"))
-        or parse_tag_name(os.environ.get("FORGEJO_REF"))
+def read_project(path: Path) -> dict[str, str]:
+    data: dict[str, str] = {}
+    in_project = False
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.split("#", 1)[0].strip()
+        if not line:
+            continue
+        if line.startswith("[") and line.endswith("]"):
+            in_project = line == "[project]"
+            continue
+        if not in_project:
+            continue
+        key, sep, raw_value = line.partition("=")
+        key = key.strip()
+        if not sep or key not in {"name", "version"}:
+            continue
+        value = raw_value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in {'"', "'"}:
+            data[key] = value[1:-1]
+    missing = {"name", "version"} - data.keys()
+    if missing:
+        fail(f"pyproject.toml is missing [project] {', '.join(sorted(missing))}.")
+    return data
+
+
+def request(
+    url: str,
+    token: str,
+    *,
+    method: str,
+    headers: dict[str, str] | None = None,
+    body: bytes | None = None,
+) -> Response:
+    req = Request(
+        url,
+        data=body,
+        method=method,
+        headers={
+            "Accept": "application/json",
+            "Authorization": f"token {token}",
+            **(headers or {}),
+        },
     )
+    try:
+        with urlopen(req, timeout=30) as res:  # noqa: S310
+            return Response(res.status, res.reason, res.read())
+    except HTTPError as exc:
+        return Response(exc.code, exc.reason, exc.read())
 
 
-def parse_tag_name(ref: str | None) -> str | None:
-    prefix = "refs/tags/"
-    return ref[len(prefix) :] if ref and ref.startswith(prefix) else None
+def require_env(name: str) -> str:
+    value = os.environ.get(name)
+    if not value:
+        fail(f"{name} is required.")
+    return value
 
 
 def trim_trailing_slash(value: str) -> str:
@@ -154,7 +175,7 @@ def trim_trailing_slash(value: str) -> str:
 
 
 def fail_response(message: str, response: Response) -> None:
-    fail(f"{message}: HTTP {response.status} {response.reason}\n{response.body}")
+    fail(f"{message}: HTTP {response.status} {response.reason}\n{response.text()}")
 
 
 def fail(message: str) -> None:
