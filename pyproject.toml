@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "bnpm"
-version = "1.20260627.0"
+version = "1.20260709.0"
 description = "A plugin manager for Binary Ninja."
 readme = "README.md"
 requires-python = ">=3.10"

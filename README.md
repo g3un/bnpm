@@ -24,6 +24,7 @@ bnpm setup
 
 ```bash
 bnpm add plugin --git github.com/owner/plugin --tag v1.2.3
+bnpm add plugin --git github.com/owner/plugin --latest-version-tag
 bnpm add devtools --git github.com/owner/devtools --branch main
 bnpm add local --path ../local-plugin
 bnpm remove plugin [plugin ...]
