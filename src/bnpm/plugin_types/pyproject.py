@@ -4,7 +4,7 @@ from pathlib import Path
 import re
 from typing import Any, Callable
 
-from ..errors import FetchError
+from ..errors import BnpmError
 from ..utils.toml import load_toml
 
 
@@ -15,7 +15,7 @@ def read_project_dependencies(path: Path) -> list[str]:
     try:
         data = load_toml(path)
     except ValueError as exc:
-        raise FetchError(f"invalid pyproject.toml: {exc}") from exc
+        raise BnpmError(f"invalid pyproject.toml: {exc}") from exc
     project = data.get("project", {})
     if not isinstance(project, dict):
         return []
@@ -25,7 +25,7 @@ def read_project_dependencies(path: Path) -> list[str]:
     if not isinstance(dependencies, list) or not all(
         isinstance(item, str) for item in dependencies
     ):
-        raise FetchError("[project].dependencies must be a list of strings")
+        raise BnpmError("[project].dependencies must be a list of strings")
     return dependencies
 
 
@@ -82,7 +82,7 @@ def _resolve_tool_bnpm_entry(
         return None
     import_base = (plugin_path / source).resolve()
     init_path = import_base / package / "__init__.py"
-    if not _is_relative_to(import_base, plugin_path.resolve()):
+    if not import_base.is_relative_to(plugin_path.resolve()):
         warn(f"skipped {name}: [tool.bnpm].source escapes plugin directory")
         return None
     if not init_path.exists():
@@ -103,11 +103,3 @@ def _get_pyproject_name(data: dict[str, Any]) -> str | None:
 
 def _resolve_import_package_name(project_name: str) -> str:
     return re.sub(r"[-.]+", "_", project_name)
-
-
-def _is_relative_to(path: Path, parent: Path) -> bool:
-    try:
-        path.relative_to(parent)
-        return True
-    except ValueError:
-        return False

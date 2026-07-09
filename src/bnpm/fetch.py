@@ -5,7 +5,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-from .errors import FetchError
+from .errors import BnpmError
 from .utils.hash import compute_tree_sha256
 from .installed import write_installed_plugin
 from .models import LockedPlugin, SourceSpec
@@ -21,10 +21,10 @@ def install(spec: SourceSpec, home: Path, report_progress=None) -> LockedPlugin:
 
 def _lock_path_spec(spec: SourceSpec, home: Path, report_progress=None) -> LockedPlugin:
     if not spec.path:
-        raise FetchError(f"{spec.name}: path source is missing path")
+        raise BnpmError(f"{spec.name}: path source is missing path")
     path = Path(spec.path).expanduser().resolve()
     if not path.exists():
-        raise FetchError(f"{spec.name}: local path does not exist: {path}")
+        raise BnpmError(f"{spec.name}: local path does not exist: {path}")
     checksum = compute_tree_sha256(path)
     return LockedPlugin(
         name=spec.name,
@@ -39,7 +39,7 @@ def _install_git_spec(
     spec: SourceSpec, home: Path, report_progress=None
 ) -> LockedPlugin:
     if not spec.git:
-        raise FetchError(f"{spec.name}: git source is missing URL")
+        raise BnpmError(f"{spec.name}: git source is missing URL")
 
     with tempfile.TemporaryDirectory(prefix="bnpm-") as temp:
         checkout = Path(temp) / "checkout"
@@ -81,7 +81,7 @@ def _run_git(args: list[str], cwd: Path | None) -> str:
     result = subprocess.run(args, cwd=cwd, text=True, capture_output=True, check=False)
     if result.returncode != 0:
         message = result.stderr.strip() or result.stdout.strip() or "unknown git error"
-        raise FetchError(message)
+        raise BnpmError(message)
     return result.stdout.strip()
 
 
@@ -108,18 +108,13 @@ def _read_requirements(plugin_path: Path, report_progress=None) -> list[str]:
     requirements_path = plugin_path / "requirements.txt"
     if pyproject_path.exists():
         if requirements_path.exists():
-            _report_progress(
-                report_progress,
-                f"ignored {requirements_path}: pyproject.toml is present",
-            )
+            if report_progress:
+                report_progress(
+                    f"ignored {requirements_path}: pyproject.toml is present"
+                )
         return pyproject.read_project_dependencies(pyproject_path)
 
     if not requirements_path.exists():
         return []
 
     return legacy_python.read_requirements_txt(requirements_path)
-
-
-def _report_progress(report_progress, message: str) -> None:
-    if report_progress is not None:
-        report_progress(message)

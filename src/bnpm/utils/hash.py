@@ -16,6 +16,12 @@ def compute_tree_sha256(path: Path) -> str:
             continue
         if item.name in IGNORED_FILES:
             continue
+        if item.is_symlink():
+            digest.update(rel.as_posix().encode("utf-8"))
+            digest.update(b"\0symlink\0")
+            digest.update(str(item.readlink()).encode("utf-8"))
+            digest.update(b"\0")
+            continue
         if item.is_dir():
             continue
         digest.update(rel.as_posix().encode("utf-8"))

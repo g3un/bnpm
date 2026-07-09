@@ -33,7 +33,7 @@ def sync(
         for spec in manifest.plugins.values()
     ]
     packages = install_packages(
-        _collect_requirements(installed), home, report_progress=report_progress
+        collect_requirements(installed), home, report_progress=report_progress
     )
     locked_plugins, locked_packages = lock_dependencies(installed, packages)
     write_lockfile(lock_path, locked_plugins, locked_packages)
@@ -49,7 +49,7 @@ def resolve_manifest_path_spec(spec: SourceSpec, base: Path) -> SourceSpec:
     return replace(spec, path=str((base / path).resolve()))
 
 
-def _collect_requirements(plugins: list[LockedPlugin]) -> list[str]:
+def collect_requirements(plugins: list[LockedPlugin]) -> list[str]:
     requirements = []
     for plugin in plugins:
         requirements.extend(

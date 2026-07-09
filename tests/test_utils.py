@@ -144,3 +144,20 @@ class UtilsTests(unittest.TestCase):
             )
 
             self.assertEqual(compute_tree_sha256(root), before)
+
+    def test_tree_sha256_hashes_symlink_target_not_contents(self):
+        with tempfile.TemporaryDirectory() as temp:
+            base = Path(temp)
+            root = base / "root"
+            root.mkdir()
+            outside = base / "outside.txt"
+            outside.write_text("one", encoding="utf-8")
+            file_link = root / "file-link"
+            file_link.symlink_to(outside)
+            dir_link = root / "dir-link"
+            dir_link.symlink_to(base)
+            before = compute_tree_sha256(root)
+
+            outside.write_text("two", encoding="utf-8")
+
+            self.assertEqual(compute_tree_sha256(root), before)

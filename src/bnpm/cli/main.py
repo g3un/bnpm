@@ -11,7 +11,7 @@ def run_cli(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     try:
-        return args.command_handler.run(args)
+        return args.command_handler(args)
     except BnpmError as exc:
         print(f"bnpm: {exc}", file=sys.stderr)
         return 1

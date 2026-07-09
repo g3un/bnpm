@@ -7,6 +7,7 @@ import sys
 from ..installed import does_installed_match_lock, read_installed_plugin
 from ..models import InstalledPlugin, LockedPlugin
 from ..plugin_types import legacy_python, pyproject
+from ..utils.hash import compute_tree_sha256
 from ..utils.locations import resolve_plugin_dir_from_lock
 from .logs import log_error, log_info, log_warning
 
@@ -30,11 +31,15 @@ def verify_install(plugin: LockedPlugin, plugin_path: Path) -> bool:
         return True
 
     installed = _read_install_metadata(plugin.name, plugin_path)
-    if installed is not None and does_installed_match_lock(installed, plugin):
-        return True
+    if installed is None or not does_installed_match_lock(installed, plugin):
+        log_warning(f"skipped {plugin.name}: install metadata does not match bnpm.lock")
+        return False
 
-    log_warning(f"skipped {plugin.name}: install metadata does not match bnpm.lock")
-    return False
+    actual = compute_tree_sha256(plugin_path)
+    if actual != plugin.checksum:
+        log_warning(f"skipped {plugin.name}: checksum mismatch")
+        return False
+    return True
 
 
 def load_plugin(name: str, plugin_path: Path) -> None:

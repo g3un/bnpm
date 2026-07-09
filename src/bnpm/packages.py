@@ -22,7 +22,8 @@ def install_packages(
 
     target.parent.mkdir(parents=True, exist_ok=True)
     if target.exists():
-        _report_progress(report_progress, f"recreating package directory {target}")
+        if report_progress:
+            report_progress(f"recreating package directory {target}")
         shutil.rmtree(target)
     target.mkdir()
 
@@ -34,19 +35,15 @@ def install_packages(
             encoding="utf-8",
             newline="",
         )
-        _report_progress(
-            report_progress,
-            f"installing {len(set(requirements))} package requirement(s) into {target}",
-        )
+        if report_progress:
+            report_progress(
+                f"installing {len(set(requirements))} package requirement(s) into {target}"
+            )
         _install_requirements(requirements_path, target)
         packages = _collect_packages_from_target(target)
-        _report_progress(report_progress, f"installed {len(packages)} package(s)")
+        if report_progress:
+            report_progress(f"installed {len(packages)} package(s)")
         return packages
-
-
-def _report_progress(report_progress, message: str) -> None:
-    if report_progress is not None:
-        report_progress(message)
 
 
 def _install_requirements(requirements_path: Path, target: Path) -> None:

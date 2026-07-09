@@ -306,7 +306,7 @@ dependencies = []
                 name="good",
                 source="https://github.com/user/plugin.git",
                 version="HEAD",
-                checksum="sha256:metadata",
+                checksum=compute_tree_sha256(plugin),
                 commit="abc123",
             )
             write_installed_plugin(plugin, locked)
@@ -350,7 +350,7 @@ dependencies = []
 
             self.assertFalse(marker.exists())
 
-    def test_git_plugin_loads_tampered_install_when_metadata_matches_lock(self):
+    def test_git_plugin_skips_tampered_install_when_metadata_matches_lock(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             home = root / "home"
@@ -379,7 +379,7 @@ dependencies = []
 
             activate(lock_path=lock, home=home)
 
-            self.assertEqual(marker.read_text(encoding="utf-8"), "bad")
+            self.assertFalse(marker.exists())
 
     def test_path_plugin_checksum_mismatch_warns_and_loads(self):
         with tempfile.TemporaryDirectory() as temp:

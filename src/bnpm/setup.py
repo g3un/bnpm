@@ -18,7 +18,7 @@ IGNORED_NAMES = {
     ".git",
     ".pytest_cache",
     ".ruff_cache",
-    # The Binary Ninja plugin bundle only needs runtime code; CLI commands run outside BN.
+    # Binary Ninja only needs the runtime files. The CLI runs outside BN.
     "cli",
 }
 

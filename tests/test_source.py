@@ -22,6 +22,11 @@ class SourceTests(unittest.TestCase):
 
         self.assertEqual(spec.version, "rev:abc123")
 
+    def test_github_table_does_not_double_git_suffix(self):
+        spec = parse_plugin("hexpatch", {"git": "github.com/user/hexpatch.git"})
+
+        self.assertEqual(spec.git, "https://github.com/user/hexpatch.git")
+
     def test_table_cannot_set_multiple_refs(self):
         with self.assertRaisesRegex(Exception, "can only set one of tag, branch, rev"):
             parse_plugin(
@@ -52,6 +57,10 @@ class SourceTests(unittest.TestCase):
     def test_inline_refs_are_not_supported(self):
         with self.assertRaisesRegex(Exception, "inline refs are not supported"):
             parse_plugin("hexpatch", "github.com/user/hexpatch@v1.2.3")
+
+    def test_http_git_url_is_rejected(self):
+        with self.assertRaisesRegex(Exception, "insecure git URL"):
+            parse_plugin("hexpatch", "http://github.com/user/hexpatch.git")
 
     def test_ssh_shorthand_does_not_treat_at_as_tag(self):
         spec = parse_plugin("hexpatch", "git@github.com:user/hexpatch.git")

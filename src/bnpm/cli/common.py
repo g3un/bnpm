@@ -6,23 +6,12 @@ import sys
 from ..errors import BnpmError
 from ..lockfile import load_lockfile
 from ..manifest import load_manifest
-from ..models import LockedPlugin, Manifest
+from ..models import Manifest
 from ..status import load_manifest_plugins, collect_lock_mismatches
 
 
 def report_progress(message: str) -> None:
     print(f"bnpm: {message}", file=sys.stderr)
-
-
-def collect_requirements(plugins: list[LockedPlugin]) -> list[str]:
-    result = []
-    for plugin in plugins:
-        result.extend(
-            plugin.requirements
-            if plugin.requirements is not None
-            else plugin.dependencies or []
-        )
-    return result
 
 
 def load_or_empty_manifest(manifest_path: Path) -> Manifest:

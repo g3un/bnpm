@@ -5,8 +5,7 @@ import os
 import platform
 from pathlib import Path
 
-from .errors import BnpmError
-from .helpers import find_bn_install_path
+from .helpers import find_bn_install_path, resolve_bn_user_dir
 from .models import Config
 
 
@@ -37,16 +36,4 @@ def _resolve_default_bnpm_data_dir() -> Path:
 
 
 def _resolve_default_bn_user_dir() -> Path:
-    override = os.environ.get("BN_USER_DIRECTORY")
-    if override:
-        return Path(override).expanduser().resolve()
-
-    system = platform.system()
-    if system == "Darwin":
-        return Path.home() / "Library" / "Application Support" / "Binary Ninja"
-    if system == "Windows":
-        base = os.environ.get("APPDATA")
-        if base:
-            return Path(base) / "Binary Ninja"
-        raise BnpmError("APPDATA is not set")
-    return Path.home() / ".binaryninja"
+    return resolve_bn_user_dir(platform.system())

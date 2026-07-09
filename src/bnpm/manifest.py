@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .errors import ManifestError
+from .errors import BnpmError
 from .models import Manifest, SourceSpec
 from .source import parse_plugin
 from .utils.atomic import write_text_atomically
@@ -11,22 +11,22 @@ from .utils.toml import load_toml
 
 def load_manifest(path: Path) -> Manifest:
     if not path.exists():
-        raise ManifestError(f"manifest not found: {path}")
+        raise BnpmError(f"manifest not found: {path}")
 
     try:
         data = load_toml(path)
     except ValueError as exc:
-        raise ManifestError(f"invalid bnpm.toml: {exc}") from exc
+        raise BnpmError(f"invalid bnpm.toml: {exc}") from exc
 
     version = data.get("version")
     if not isinstance(version, int):
-        raise ManifestError("version must be an integer")
+        raise BnpmError("version must be an integer")
     if version != 1:
-        raise ManifestError(f"unsupported bnpm.toml version: {version}")
+        raise BnpmError(f"unsupported bnpm.toml version: {version}")
 
     plugins_data = data.get("plugins", {})
     if not isinstance(plugins_data, dict):
-        raise ManifestError("[plugins] must be a table")
+        raise BnpmError("[plugins] must be a table")
 
     plugins = {
         name: parse_plugin(name, value) for name, value in sorted(plugins_data.items())

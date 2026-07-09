@@ -5,19 +5,14 @@ from pathlib import Path
 
 from ..config import get_config
 from ..sync import sync
-from .command import Command
 from .common import report_progress
 
 
-class SyncCommand(Command):
-    name = "sync"
-
-    @classmethod
-    def run(cls, args: Namespace) -> int:
-        config = get_config()
-        return sync_plugins(
-            config.bnpm_manifest_path, config.bnpm_lock_path, config.bnpm_plugin_dir
-        )
+def run(args: Namespace) -> int:
+    config = get_config()
+    return sync_plugins(
+        config.bnpm_manifest_path, config.bnpm_lock_path, config.bnpm_plugin_dir
+    )
 
 
 def sync_plugins(manifest_path: Path, lock_path: Path, home: Path) -> int:
