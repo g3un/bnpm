@@ -59,6 +59,8 @@ def _format_plugin(spec: SourceSpec) -> str:
         fields.append(f'branch = "{_escape(spec.branch)}"')
     if spec.rev:
         fields.append(f'rev = "{_escape(spec.rev)}"')
+    if spec.latest_tag:
+        fields.append("latest-version-tag = true")
     return "{ " + ", ".join(fields) + " }"
 
 

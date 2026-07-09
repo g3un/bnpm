@@ -15,9 +15,14 @@ def parse_plugin(name: str, value: object) -> SourceSpec:
 
 
 def _parse_table(name: str, value: dict[str, object]) -> SourceSpec:
+    latest_tag = _read_optional_bool(value, "latest-version-tag")
     keys = [key for key in ("tag", "branch", "rev") if value.get(key)]
+    if latest_tag:
+        keys.append("latest-version-tag")
     if len(keys) > 1:
-        raise BnpmError(f"plugin {name!r} can only set one of tag, branch, rev")
+        raise BnpmError(
+            f"plugin {name!r} can only set one of tag, branch, rev, latest-version-tag"
+        )
 
     tag = _read_optional_str(name, value, "tag")
     branch = _read_optional_str(name, value, "branch")
@@ -28,7 +33,9 @@ def _parse_table(name: str, value: dict[str, object]) -> SourceSpec:
         if "git" in value:
             raise BnpmError(f"plugin {name!r} cannot set both git and path")
         if keys:
-            raise BnpmError(f"path plugin {name!r} cannot set tag, branch, or rev")
+            raise BnpmError(
+                f"path plugin {name!r} cannot set tag, branch, rev, or latest-version-tag"
+            )
         return SourceSpec(name=name, kind="path", path=path)
 
     git = _read_required_str(name, value, "git")
@@ -39,6 +46,7 @@ def _parse_table(name: str, value: dict[str, object]) -> SourceSpec:
         tag=tag,
         branch=branch,
         rev=rev,
+        latest_tag=latest_tag,
     )
 
 
@@ -98,3 +106,10 @@ def _read_optional_str(name: str, table: dict[str, object], key: str) -> str | N
     if key not in table:
         return None
     return _read_required_str(name, table, key)
+
+
+def _read_optional_bool(table: dict[str, object], key: str) -> bool:
+    value = table.get(key, False)
+    if not isinstance(value, bool):
+        raise BnpmError(f"field {key!r} must be a boolean")
+    return value

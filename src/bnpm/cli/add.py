@@ -22,6 +22,7 @@ def configure_parser(parser: ArgumentParser) -> None:
     ref_group.add_argument("--tag")
     ref_group.add_argument("--branch")
     ref_group.add_argument("--rev")
+    ref_group.add_argument("--latest-version-tag", action="store_true")
 
 
 def run(args: Namespace) -> int:
@@ -32,6 +33,7 @@ def run(args: Namespace) -> int:
     tag = args.tag
     branch = args.branch
     rev = args.rev
+    latest_tag = args.latest_version_tag
     manifest_path = config.bnpm_manifest_path
     lock_path = config.bnpm_lock_path
     home = config.bnpm_plugin_dir
@@ -40,14 +42,18 @@ def run(args: Namespace) -> int:
     manifest = load_or_empty_manifest(manifest_path)
 
     if path is not None:
-        if tag or branch or rev:
-            raise BnpmError("local path plugins cannot set tag, branch, or rev")
+        if tag or branch or rev or latest_tag:
+            raise BnpmError(
+                "local path plugins cannot set tag, branch, rev, or latest-version-tag"
+            )
         source_path = Path(path).expanduser()
         spec = parse_plugin(name, {"path": str(source_path.resolve())})
     else:
         assert git is not None
         spec = parse_plugin(name, git)
-        spec = _apply_ref_options(spec, tag=tag, branch=branch, rev=rev)
+        spec = _apply_ref_options(
+            spec, tag=tag, branch=branch, rev=rev, latest_tag=latest_tag
+        )
 
     plugins = dict(manifest.plugins)
     plugins[name] = spec
@@ -61,11 +67,14 @@ def _apply_ref_options(
     tag: str | None,
     branch: str | None,
     rev: str | None,
+    latest_tag: bool,
 ) -> SourceSpec:
-    if not any((tag, branch, rev)):
+    if not any((tag, branch, rev, latest_tag)):
         return spec
     if spec.kind == "path":
-        raise BnpmError("local path plugins cannot set tag, branch, or rev")
-    if spec.tag or spec.branch or spec.rev:
+        raise BnpmError(
+            "local path plugins cannot set tag, branch, rev, or latest-version-tag"
+        )
+    if spec.tag or spec.branch or spec.rev or spec.latest_tag:
         raise BnpmError("plugin source already specifies a ref")
-    return replace(spec, tag=tag, branch=branch, rev=rev)
+    return replace(spec, tag=tag, branch=branch, rev=rev, latest_tag=latest_tag)

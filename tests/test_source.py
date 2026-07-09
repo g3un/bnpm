@@ -27,6 +27,18 @@ class SourceTests(unittest.TestCase):
 
         self.assertEqual(spec.git, "https://github.com/user/hexpatch.git")
 
+    def test_git_table_with_latest_version_tag(self):
+        spec = parse_plugin(
+            "hexpatch",
+            {
+                "git": "https://github.com/user/hexpatch.git",
+                "latest-version-tag": True,
+            },
+        )
+
+        self.assertTrue(spec.latest_tag)
+        self.assertEqual(spec.version, "latest-version-tag")
+
     def test_table_cannot_set_multiple_refs(self):
         with self.assertRaisesRegex(Exception, "can only set one of tag, branch, rev"):
             parse_plugin(

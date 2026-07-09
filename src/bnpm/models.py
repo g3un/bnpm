@@ -52,6 +52,7 @@ class SourceSpec:
     tag: str | None = None
     branch: str | None = None
     rev: str | None = None
+    latest_tag: bool = False
 
     @property
     def version(self) -> str | None:
@@ -63,6 +64,8 @@ class SourceSpec:
             return f"rev:{self.rev}"
         if self.branch:
             return f"branch:{self.branch}"
+        if self.latest_tag:
+            return "latest-version-tag"
         return "HEAD"
 
 

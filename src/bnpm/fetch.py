@@ -75,6 +75,12 @@ def _checkout(spec: SourceSpec, checkout: Path) -> None:
         _run_git(["git", "checkout", "--quiet", spec.rev], cwd=checkout)
     elif spec.branch:
         _run_git(["git", "checkout", "--quiet", spec.branch], cwd=checkout)
+    elif spec.latest_tag:
+        tags = _run_git(["git", "tag", "--list", "--sort=-v:refname"], cwd=checkout)
+        tag = tags.splitlines()[0] if tags else ""
+        if not tag:
+            raise BnpmError(f"{spec.name}: no git tags found")
+        _run_git(["git", "checkout", "--quiet", f"tags/{tag}"], cwd=checkout)
 
 
 def _run_git(args: list[str], cwd: Path | None) -> str:

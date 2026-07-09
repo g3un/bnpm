@@ -5,6 +5,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+from bnpm.errors import BnpmError
 from bnpm.fetch import install
 from bnpm.installed import read_installed_plugin
 from bnpm.source import SourceSpec
@@ -50,6 +51,64 @@ class FetchTests(unittest.TestCase):
             self.assertEqual(installed.commit, locked.commit)
             self.assertEqual(installed.checksum, locked.checksum)
             self.assertEqual(list(home.glob(".*.tmp")), [])
+
+    def test_git_install_with_latest_version_tag_checks_out_newest_tag(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            home = root / "home"
+            commands = []
+
+            def fake_run_git(args, cwd):
+                commands.append(args)
+                if args[:3] == ["git", "clone", "--quiet"]:
+                    checkout = Path(args[-1])
+                    checkout.mkdir()
+                    checkout.joinpath("__init__.py").write_text("", encoding="utf-8")
+                    return ""
+                if args[:3] == ["git", "tag", "--list"]:
+                    return "v2.0.0\nv1.0.0"
+                if args[:3] == ["git", "rev-parse", "HEAD"]:
+                    return "abc123"
+                return ""
+
+            with patch("bnpm.fetch._run_git", side_effect=fake_run_git):
+                locked = install(
+                    SourceSpec(
+                        name="stable",
+                        kind="git",
+                        git="https://github.com/user/stable.git",
+                        latest_tag=True,
+                    ),
+                    home,
+                )
+
+            self.assertEqual(locked.version, "latest-version-tag")
+            self.assertIn(["git", "checkout", "--quiet", "tags/v2.0.0"], commands)
+
+    def test_git_install_with_latest_version_tag_requires_tags(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            home = root / "home"
+
+            def fake_run_git(args, cwd):
+                if args[:3] == ["git", "clone", "--quiet"]:
+                    Path(args[-1]).mkdir()
+                    return ""
+                if args[:3] == ["git", "tag", "--list"]:
+                    return ""
+                return ""
+
+            with patch("bnpm.fetch._run_git", side_effect=fake_run_git):
+                with self.assertRaisesRegex(BnpmError, "no git tags found"):
+                    install(
+                        SourceSpec(
+                            name="stable",
+                            kind="git",
+                            git="https://github.com/user/stable.git",
+                            latest_tag=True,
+                        ),
+                        home,
+                    )
 
     def test_git_install_rolls_back_existing_target_when_replace_fails(self):
         with tempfile.TemporaryDirectory() as temp:

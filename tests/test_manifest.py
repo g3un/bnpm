@@ -4,7 +4,8 @@ import tempfile
 from pathlib import Path
 import unittest
 
-from bnpm.manifest import load_manifest
+from bnpm.manifest import load_manifest, write_manifest
+from bnpm.models import SourceSpec
 from bnpm.utils.toml import _parse_subset
 
 
@@ -51,11 +52,32 @@ version = 1
 [plugins]
 hexpatch = { git = "https://github.com/user/hexpatch.git", tag = "v1.2.3" }
 devtools = { git = "https://github.com/user/devtools.git", branch = "main" }
+stable = { git = "https://github.com/user/stable.git", latest-version-tag = true }
 """.strip()
         )
 
         self.assertEqual(data["version"], 1)
         self.assertEqual(data["plugins"]["devtools"]["branch"], "main")
+        self.assertTrue(data["plugins"]["stable"]["latest-version-tag"])
+
+    def test_write_manifest_latest_version_tag(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "bnpm.toml"
+
+            write_manifest(
+                path,
+                {
+                    "stable": SourceSpec(
+                        name="stable",
+                        kind="git",
+                        git="https://github.com/user/stable.git",
+                        latest_tag=True,
+                    )
+                },
+            )
+            manifest = load_manifest(path)
+
+        self.assertTrue(manifest.plugins["stable"].latest_tag)
 
     def test_toml_subset_parser_supports_pyproject_shape(self):
         data = _parse_subset(

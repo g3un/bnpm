@@ -93,6 +93,8 @@ def _parse_value(value: str) -> Any:
         return _parse_array(value)
     if value.startswith("{") and value.endswith("}"):
         return _parse_inline_table(value)
+    if value in {"true", "false"}:
+        return value == "true"
     if value.isdigit():
         return int(value)
     raise ValueError(f"unsupported TOML value: {value}")
